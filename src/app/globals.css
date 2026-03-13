@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0b1020;
+  --background-soft: #12192b;
+  --surface: #111827;
+  --surface-2: #172033;
+  --text: #f3f4f6;
+  --text-soft: #aab4c5;
+  --primary: #5b8cff;
+  --primary-hover: #7aa2ff;
+  --accent: #7c3aed;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --border: rgba(255, 255, 255, 0.08);
+}
+
+html, body {
+  background: var(--background);
+  color: var(--text);
+}
+
+body {
+  min-height: 100vh;
+}
+
+.container-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
