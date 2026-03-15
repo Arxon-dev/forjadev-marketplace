@@ -1,10 +1,10 @@
 import { SiteHeader } from "@/components/layout/site-header";
 import { Hero } from "@/components/marketplace/hero";
 import { ProductCard } from "@/components/marketplace/product-card";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function HomePage() {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createClient();
 
   const { data: products } = await supabase
     .from("products")

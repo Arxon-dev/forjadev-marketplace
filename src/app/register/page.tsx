@@ -1,7 +1,14 @@
+import { Suspense } from "react";
+import { RegisterForm } from "@/components/auth/register-form";
+import { SiteHeader } from "@/components/layout/site-header";
+
 export default function RegisterPage() {
   return (
-    <main className="container-shell py-16">
-      <h1 className="text-3xl font-bold text-white">Crear cuenta</h1>
+    <main>
+      <SiteHeader />
+      <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Cargando...</div>}>
+        <RegisterForm />
+      </Suspense>
     </main>
   );
 }

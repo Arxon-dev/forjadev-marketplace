@@ -1,7 +1,11 @@
+import { DashboardContent } from "@/components/dashboard/dashboard-content";
+import { SiteHeader } from "@/components/layout/site-header";
+
 export default function DashboardPage() {
   return (
-    <main className="container-shell py-16">
-      <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+    <main>
+      <SiteHeader />
+      <DashboardContent />
     </main>
   );
 }

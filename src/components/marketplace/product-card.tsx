@@ -1,5 +1,7 @@
-import { Card } from "@/components/ui/card";
+import Image from "next/image";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 
 interface ProductCardProps {
   title: string;
@@ -7,12 +9,32 @@ interface ProductCardProps {
   category: string;
   price: string;
   compatibility: string;
+  href?: string;
+  imageUrl?: string | null;
 }
 
-export function ProductCard({ title, author, category, price, compatibility }: ProductCardProps) {
-  return (
+export function ProductCard({
+  title,
+  author,
+  category,
+  price,
+  compatibility,
+  href,
+  imageUrl,
+}: ProductCardProps) {
+  const content = (
     <Card className="overflow-hidden p-4 hover:bg-white/[0.07]">
-      <div className="mb-4 aspect-[16/9] rounded-xl bg-white/5" />
+      {imageUrl ? (
+        <Image
+          src={imageUrl}
+          alt={title}
+          width={800}
+          height={450}
+          className="mb-4 aspect-[16/9] w-full rounded-xl object-cover"
+        />
+      ) : (
+        <div className="mb-4 aspect-[16/9] rounded-xl bg-white/5" />
+      )}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-white">{title}</h3>
@@ -26,4 +48,14 @@ export function ProductCard({ title, author, category, price, compatibility }: P
       </div>
     </Card>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className="block transition-transform hover:-translate-y-1">
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
 }
