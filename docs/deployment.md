@@ -20,6 +20,7 @@
 - required vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - for Next.js 16 in Railway/Nixpacks, keep Node 22 via `package.json` engines and set `NIXPACKS_NODE_VERSION=22`
 - set `HOSTNAME=0.0.0.0` in Railway so the standalone server binds correctly inside the container
+- copy `.next/static` and `public` into `.next/standalone` during build so CSS, JS and static assets resolve correctly in production
 - after first successful deploy, generate a Railway public domain from the service settings or CLI
 - verify the public URL responds with `200` before testing auth, checkout or downloads
 
