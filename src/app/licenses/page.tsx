@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { SiteHeader } from "@/components/layout/site-header";
+import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function LicensesPage() {
@@ -26,7 +26,7 @@ export default async function LicensesPage() {
 
   return (
     <main>
-      <SiteHeader />
+      <SiteHeaderServer />
       <section className="container-shell py-16">
         <p className="text-sm uppercase tracking-[0.2em] text-[var(--text-soft)]">Licencias</p>
         <h1 className="mt-3 text-4xl font-bold text-white">Tu biblioteca de licencias</h1>

@@ -1,61 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
 
-export function SiteHeader() {
-  const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<string | null>(null);
+interface SiteHeaderProps {
+  isAuthenticated?: boolean;
+  userEmail?: string | null;
+  role?: string | null;
+}
 
-  useEffect(() => {
-    const supabase = createClient();
-
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      setUser(user);
-
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-        setRole(profile?.role ?? null);
-      } else {
-        setRole(null);
-      }
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
-        setRole(profile?.role ?? null);
-      } else {
-        setRole(null);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
+export function SiteHeader({
+  isAuthenticated = false,
+  userEmail = null,
+  role = null,
+}: SiteHeaderProps) {
+  const user = isAuthenticated ? { email: userEmail } : null;
 
   const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    setUser(null);
-    setRole(null);
-    window.location.href = "/";
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+      });
+    } finally {
+      window.location.href = "/";
+    }
   };
 
   return (

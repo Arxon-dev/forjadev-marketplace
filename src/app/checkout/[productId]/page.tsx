@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { CheckoutButton } from "@/components/checkout/checkout-button";
-import { SiteHeader } from "@/components/layout/site-header";
+import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { createClient } from "@/lib/supabase/server";
 
 interface Props {
@@ -54,7 +54,7 @@ export default async function CheckoutPage({ params }: Props) {
 
   return (
     <main>
-      <SiteHeader />
+      <SiteHeaderServer />
       <section className="container-shell py-16">
         <p className="text-sm uppercase tracking-[0.2em] text-[var(--text-soft)]">
           Checkout

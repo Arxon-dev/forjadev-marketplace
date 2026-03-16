@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ModerationActions } from "@/components/admin/moderation-actions";
 import { ModerationStatusPill } from "@/components/admin/moderation-status-pill";
-import { SiteHeader } from "@/components/layout/site-header";
+import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { Button } from "@/components/ui/button";
 import { requireAdminContext } from "@/lib/auth/admin";
 
@@ -48,7 +48,7 @@ export default async function AdminProductReviewPage({ params }: Props) {
 
   return (
     <main>
-      <SiteHeader />
+      <SiteHeaderServer />
       <section className="container-shell py-16">
         <div className="mb-8 flex items-center justify-between">
           <div>

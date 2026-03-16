@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LicenseActions } from "@/components/admin/license-actions";
-import { SiteHeader } from "@/components/layout/site-header";
+import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { Button } from "@/components/ui/button";
 import { requireAdminContext } from "@/lib/auth/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -78,7 +78,7 @@ export default async function AdminLicensesPage({ searchParams }: AdminLicensesP
 
   return (
     <main>
-      <SiteHeader />
+      <SiteHeaderServer />
       <section className="container-shell py-16">
         <div className="mb-10 flex flex-wrap items-end justify-between gap-4">
           <div>

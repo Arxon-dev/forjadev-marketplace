@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DownloadButton } from "@/components/downloads/download-button";
-import { SiteHeader } from "@/components/layout/site-header";
+import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { ReviewForm } from "@/components/reviews/review-form";
 import { createClient } from "@/lib/supabase/server";
 
@@ -143,7 +143,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
   return (
     <main>
-      <SiteHeader />
+      <SiteHeaderServer />
       <section className="container-shell py-16">
         <div className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr]">
           <div>

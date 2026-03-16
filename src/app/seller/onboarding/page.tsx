@@ -1,10 +1,10 @@
-import { SiteHeader } from "@/components/layout/site-header";
+import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { OnboardingForm } from "@/components/seller/onboarding-form";
 
 export default function SellerOnboardingPage() {
   return (
     <main>
-      <SiteHeader />
+      <SiteHeaderServer />
       <OnboardingForm />
     </main>
   );

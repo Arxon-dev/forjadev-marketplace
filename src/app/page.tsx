@@ -1,4 +1,4 @@
-import { SiteHeader } from "@/components/layout/site-header";
+import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { Hero } from "@/components/marketplace/hero";
 import { ProductCard } from "@/components/marketplace/product-card";
 import { createClient } from "@/lib/supabase/server";
@@ -22,7 +22,7 @@ export default async function HomePage() {
 
   return (
     <main>
-      <SiteHeader />
+      <SiteHeaderServer />
       <Hero />
 
       <section className="container-shell pb-20">

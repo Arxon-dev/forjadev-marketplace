@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ModerationStatusPill } from "@/components/admin/moderation-status-pill";
-import { SiteHeader } from "@/components/layout/site-header";
+import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { Button } from "@/components/ui/button";
 import { requireAdminContext } from "@/lib/auth/admin";
 
@@ -48,7 +48,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   return (
     <main>
-      <SiteHeader />
+      <SiteHeaderServer />
       <section className="container-shell py-16">
         <div className="mb-10">
           <p className="text-sm uppercase tracking-[0.2em] text-[var(--text-soft)]">

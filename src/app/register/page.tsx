@@ -1,11 +1,11 @@
 import { Suspense } from "react";
 import { RegisterForm } from "@/components/auth/register-form";
-import { SiteHeader } from "@/components/layout/site-header";
+import { SiteHeaderServer } from "@/components/layout/site-header-server";
 
 export default function RegisterPage() {
   return (
     <main>
-      <SiteHeader />
+      <SiteHeaderServer />
       <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Cargando...</div>}>
         <RegisterForm />
       </Suspense>

@@ -1,4 +1,4 @@
-import { SiteHeader } from "@/components/layout/site-header";
+import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { ProductCard } from "@/components/marketplace/product-card";
 import { ProductFilters } from "@/components/marketplace/product-filters";
 import { createClient } from "@/lib/supabase/server";
@@ -53,7 +53,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
   return (
     <main>
-      <SiteHeader />
+      <SiteHeaderServer />
       <section className="container-shell py-16">
         <h1 className="text-3xl font-bold text-white">Productos</h1>
         <p className="mt-3 text-[var(--text-soft)]">

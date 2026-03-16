@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { SiteHeader } from "@/components/layout/site-header";
+import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { SellerPageContent } from "@/components/seller/seller-page-content";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,7 +15,7 @@ export default async function SellerPage() {
 
   return (
     <main>
-      <SiteHeader />
+      <SiteHeaderServer />
       <SellerPageContent userId={user.id} />
     </main>
   );

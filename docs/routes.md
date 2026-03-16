@@ -19,6 +19,7 @@
 
 ## API
 - /api/auth/login
+- /api/auth/logout
 - /api/download/[productId]
 - /api/checkout/[productId]
 - /api/admin/products/[productId]/moderate
