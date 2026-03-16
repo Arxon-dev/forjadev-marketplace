@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "npm run lint && next build && node ./scripts/prepare-standalone.mjs",
+    "build": "npm run lint && next build --webpack && node ./scripts/prepare-standalone.mjs",
     "start": "next start",
     "lint": "eslint .",
     "smoke:marketplace": "node ./scripts/smoke-marketplace.mjs",

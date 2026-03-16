@@ -17,6 +17,7 @@
 - use `railway.toml` for build and start commands
 - build command: `npm run build`
 - start command: `node .next/standalone/server.js`
+- production build uses `next build --webpack` to avoid stale client chunks after Railway redeploys
 - required vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - for Next.js 16 in Railway/Nixpacks, keep Node 22 via `package.json` engines and set `NIXPACKS_NODE_VERSION=22`
 - set `HOSTNAME=0.0.0.0` in Railway so the standalone server binds correctly inside the container
