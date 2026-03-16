@@ -1,37 +1,22 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { redirect } from "next/navigation";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SellerPageContent } from "@/components/seller/seller-page-content";
+import { createClient } from "@/lib/supabase/server";
 
-export default function SellerPage() {
-  const [userId, setUserId] = useState<string | null>(null);
+export default async function SellerPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  useEffect(() => {
-    const getUser = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      setUserId(user?.id ?? null);
-    };
-    getUser();
-  }, []);
-
-  if (!userId) {
-    return (
-      <main>
-        <SiteHeader />
-        <section className="container-shell flex min-h-screen items-center justify-center py-16">
-          <div className="text-center text-[var(--text-soft)]">Cargando...</div>
-        </section>
-      </main>
-    );
+  if (!user) {
+    redirect("/login");
   }
 
   return (
     <main>
       <SiteHeader />
-      <SellerPageContent userId={userId} />
+      <SellerPageContent userId={user.id} />
     </main>
   );
 }
