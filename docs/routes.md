@@ -18,6 +18,7 @@
 - /licenses
 
 ## API
+- /api/auth/login
 - /api/download/[productId]
 - /api/checkout/[productId]
 - /api/admin/products/[productId]/moderate
