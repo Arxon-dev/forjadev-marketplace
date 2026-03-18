@@ -56,18 +56,122 @@ export interface Database {
           bio?: string | null;
         };
       };
+      seller_reputation_snapshots: {
+        Row: {
+          vendor_id: string;
+          approved_products: number;
+          free_products: number;
+          paid_products: number;
+          total_downloads: number;
+          total_purchases: number;
+          total_ratings: number;
+          average_rating: number | null;
+          joined_at: string;
+          latest_product_update_at: string | null;
+          reputation_score: number;
+          updated_at: string;
+        };
+        Insert: {
+          vendor_id: string;
+          approved_products?: number;
+          free_products?: number;
+          paid_products?: number;
+          total_downloads?: number;
+          total_purchases?: number;
+          total_ratings?: number;
+          average_rating?: number | null;
+          joined_at: string;
+          latest_product_update_at?: string | null;
+          reputation_score?: number;
+          updated_at?: string;
+        };
+        Update: {
+          approved_products?: number;
+          free_products?: number;
+          paid_products?: number;
+          total_downloads?: number;
+          total_purchases?: number;
+          total_ratings?: number;
+          average_rating?: number | null;
+          joined_at?: string;
+          latest_product_update_at?: string | null;
+          reputation_score?: number;
+          updated_at?: string;
+        };
+      };
+      seller_badges: {
+        Row: {
+          id: string;
+          vendor_id: string;
+          code: string;
+          label: string;
+          tone: "primary" | "success" | "warning";
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          vendor_id: string;
+          code: string;
+          label: string;
+          tone: "primary" | "success" | "warning";
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          code?: string;
+          label?: string;
+          tone?: "primary" | "success" | "warning";
+          sort_order?: number;
+        };
+      };
+      games: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          name?: string;
+          slug?: string;
+          is_active?: boolean;
+          sort_order?: number;
+        };
+      };
       products: {
         Row: {
           id: string;
           vendor_id: string;
           category_id: string | null;
+          game_id: string | null;
           title: string;
           slug: string;
           short_description: string | null;
           description: string | null;
+          support_policy: string | null;
+          refund_policy: string | null;
+          update_policy: string | null;
           price_cents: number;
           currency: string;
           is_free: boolean;
+          featured: boolean;
+          search_text: string | null;
+          view_count: number;
+          download_count: number;
+          purchase_count: number;
+          rating_average: number;
+          rating_count: number;
           moderation_status: "draft" | "pending" | "approved" | "rejected" | "hidden";
           rejection_reason?: string | null;
           compatibility: string | null;
@@ -79,13 +183,24 @@ export interface Database {
           id?: string;
           vendor_id: string;
           category_id?: string | null;
+          game_id?: string | null;
           title: string;
           slug: string;
           short_description?: string | null;
           description?: string | null;
+          support_policy?: string | null;
+          refund_policy?: string | null;
+          update_policy?: string | null;
           price_cents?: number;
           currency?: string;
           is_free?: boolean;
+          featured?: boolean;
+          search_text?: string | null;
+          view_count?: number;
+          download_count?: number;
+          purchase_count?: number;
+          rating_average?: number;
+          rating_count?: number;
           moderation_status?: "draft" | "pending" | "approved" | "rejected" | "hidden";
           rejection_reason?: string | null;
           compatibility?: string | null;
@@ -95,18 +210,74 @@ export interface Database {
         };
         Update: {
           category_id?: string | null;
+          game_id?: string | null;
           title?: string;
           slug?: string;
           short_description?: string | null;
           description?: string | null;
+          support_policy?: string | null;
+          refund_policy?: string | null;
+          update_policy?: string | null;
           price_cents?: number;
           currency?: string;
           is_free?: boolean;
+          featured?: boolean;
+          search_text?: string | null;
+          view_count?: number;
+          download_count?: number;
+          purchase_count?: number;
+          rating_average?: number;
+          rating_count?: number;
           moderation_status?: "draft" | "pending" | "approved" | "rejected" | "hidden";
           rejection_reason?: string | null;
           compatibility?: string | null;
           featured_image_url?: string | null;
           updated_at?: string;
+        };
+      };
+      categories: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          description: string | null;
+          parent_id: string | null;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          description?: string | null;
+          parent_id?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          name?: string;
+          slug?: string;
+          description?: string | null;
+          parent_id?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
+        };
+      };
+      product_categories: {
+        Row: {
+          product_id: string;
+          category_id: string;
+          created_at: string;
+        };
+        Insert: {
+          product_id: string;
+          category_id: string;
+          created_at?: string;
+        };
+        Update: {
+          category_id?: string;
         };
       };
       product_versions: {
@@ -127,6 +298,52 @@ export interface Database {
         Update: {
           version?: string;
           changelog?: string | null;
+        };
+      };
+      product_faqs: {
+        Row: {
+          id: string;
+          product_id: string;
+          question: string;
+          answer: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          question: string;
+          answer: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          question?: string;
+          answer?: string;
+          sort_order?: number;
+        };
+      };
+      product_guides: {
+        Row: {
+          id: string;
+          product_id: string;
+          title: string;
+          body: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          title: string;
+          body: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          title?: string;
+          body?: string;
+          sort_order?: number;
         };
       };
       product_files: {
@@ -236,6 +453,101 @@ export interface Database {
           downloaded_at?: string;
         };
       };
+      support_tickets: {
+        Row: {
+          id: string;
+          product_id: string;
+          vendor_id: string;
+          buyer_user_id: string;
+          subject: string;
+          status: "open" | "waiting_seller" | "waiting_buyer" | "closed";
+          priority: "normal" | "high";
+          created_at: string;
+          updated_at: string;
+          last_message_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          vendor_id: string;
+          buyer_user_id: string;
+          subject: string;
+          status?: "open" | "waiting_seller" | "waiting_buyer" | "closed";
+          priority?: "normal" | "high";
+          created_at?: string;
+          updated_at?: string;
+          last_message_at?: string;
+        };
+        Update: {
+          subject?: string;
+          status?: "open" | "waiting_seller" | "waiting_buyer" | "closed";
+          priority?: "normal" | "high";
+          updated_at?: string;
+          last_message_at?: string;
+        };
+      };
+      support_messages: {
+        Row: {
+          id: string;
+          ticket_id: string;
+          sender_user_id: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          ticket_id: string;
+          sender_user_id: string;
+          body: string;
+          created_at?: string;
+        };
+        Update: {
+          body?: string;
+        };
+      };
+      user_notifications: {
+        Row: {
+          id: string;
+          recipient_user_id: string;
+          actor_user_id: string | null;
+          kind: string;
+          title: string;
+          body: string;
+          href: string | null;
+          entity_type: string | null;
+          entity_id: string | null;
+          metadata: Json | null;
+          is_read: boolean;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          recipient_user_id: string;
+          actor_user_id?: string | null;
+          kind: string;
+          title: string;
+          body: string;
+          href?: string | null;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          metadata?: Json | null;
+          is_read?: boolean;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          kind?: string;
+          title?: string;
+          body?: string;
+          href?: string | null;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          metadata?: Json | null;
+          is_read?: boolean;
+          read_at?: string | null;
+        };
+      };
       licenses: {
         Row: {
           id: string;
@@ -286,6 +598,33 @@ export interface Database {
           metadata?: Json | null;
         };
       };
+      marketplace_events: {
+        Row: {
+          id: string;
+          actor_user_id: string | null;
+          session_id: string;
+          event_name: string;
+          page_type: string;
+          entity_type: string | null;
+          entity_id: string | null;
+          metadata: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          actor_user_id?: string | null;
+          session_id: string;
+          event_name: string;
+          page_type: string;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          metadata?: Json | null;
+        };
+      };
     };
     Functions: {
       create_checkout_order: {
@@ -304,6 +643,36 @@ export interface Database {
           p_user_id?: string;
         };
         Returns: string;
+      };
+      refresh_seller_badges: {
+        Args: {
+          p_vendor_id?: string | null;
+        };
+        Returns: void;
+      };
+      refresh_seller_reputation_snapshot: {
+        Args: {
+          p_vendor_id?: string | null;
+        };
+        Returns: void;
+      };
+      refresh_seller_trust: {
+        Args: {
+          p_vendor_id?: string | null;
+        };
+        Returns: void;
+      };
+      refresh_product_metrics: {
+        Args: {
+          p_product_id?: string | null;
+        };
+        Returns: void;
+      };
+      refresh_product_and_seller_metrics: {
+        Args: {
+          p_product_id: string;
+        };
+        Returns: void;
       };
     };
   };

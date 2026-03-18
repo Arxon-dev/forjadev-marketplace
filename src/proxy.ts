@@ -1,7 +1,42 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PROTECTED_ROUTES = ["/dashboard", "/seller", "/admin", "/orders", "/licenses", "/checkout"];
+function isProtectedRoute(pathname: string) {
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
+    return true;
+  }
+
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    return true;
+  }
+
+  if (pathname === "/orders" || pathname.startsWith("/orders/")) {
+    return true;
+  }
+
+  if (pathname === "/support" || pathname.startsWith("/support/")) {
+    return true;
+  }
+
+  if (pathname === "/licenses" || pathname.startsWith("/licenses/")) {
+    return true;
+  }
+
+  if (pathname === "/checkout" || pathname.startsWith("/checkout/")) {
+    return true;
+  }
+
+  if (
+    pathname === "/seller" ||
+    pathname === "/seller/new" ||
+    pathname === "/seller/onboarding" ||
+    /^\/seller\/[^/]+\/edit$/.test(pathname)
+  ) {
+    return true;
+  }
+
+  return false;
+}
 
 export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
@@ -25,11 +60,7 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isProtectedRoute = PROTECTED_ROUTES.some((route) =>
-    request.nextUrl.pathname.startsWith(route)
-  );
-
-  if (isProtectedRoute && !user) {
+  if (isProtectedRoute(request.nextUrl.pathname) && !user) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

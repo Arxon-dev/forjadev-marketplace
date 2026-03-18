@@ -1,3 +1,4 @@
+import { MarketplaceTracker } from "@/components/analytics/marketplace-tracker";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { ProductCard } from "@/components/marketplace/product-card";
 import { ProductFilters } from "@/components/marketplace/product-filters";
@@ -8,6 +9,8 @@ interface ProductsPageProps {
     q?: string;
     pricing?: string;
     sort?: string;
+    game?: string;
+    category?: string;
   }>;
 }
 
@@ -16,15 +19,61 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const query = params.q?.trim() || "";
   const pricing = params.pricing || "all";
   const sort = params.sort || "newest";
+  const game = params.game || "all";
+  const category = params.category || "all";
 
   const supabase = await createClient();
+
+  const [{ data: games }, { data: categories }] = await Promise.all([
+    supabase
+      .from("games")
+      .select("id, name, slug, sort_order")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true }),
+    supabase
+      .from("categories")
+      .select("id, name, slug, parent_id, sort_order")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true }),
+  ]);
+
+  let filteredProductIds: string[] | null = null;
+
+  if (category !== "all") {
+    const selectedCategory = (categories || []).find((item) => item.slug === category) || null;
+
+    if (!selectedCategory) {
+      filteredProductIds = [];
+    } else {
+      const relatedCategoryIds = [
+        selectedCategory.id,
+        ...(selectedCategory.parent_id === null
+          ? (categories || [])
+              .filter((item) => item.parent_id === selectedCategory.id)
+              .map((item) => item.id)
+          : []),
+      ];
+
+      const { data: mappings } = await supabase
+        .from("product_categories")
+        .select("product_id")
+        .in("category_id", relatedCategoryIds);
+
+      filteredProductIds = Array.from(new Set((mappings || []).map((item) => item.product_id)));
+    }
+  }
+
   let productsQuery = supabase
     .from("products")
-    .select("id, vendor_id, title, slug, price_cents, is_free, compatibility, featured_image_url")
+    .select(
+      "id, vendor_id, title, slug, price_cents, is_free, compatibility, featured_image_url, category_id, game_id, featured, rating_average, rating_count, download_count, purchase_count, created_at, updated_at"
+    )
     .eq("moderation_status", "approved");
 
   if (query) {
-    productsQuery = productsQuery.ilike("title", `%${query}%`);
+    productsQuery = productsQuery.ilike("search_text", `%${query}%`);
   }
 
   if (pricing === "free") {
@@ -33,7 +82,44 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     productsQuery = productsQuery.eq("is_free", false);
   }
 
-  if (sort === "price_asc") {
+  if (game !== "all") {
+    const selectedGame = (games || []).find((item) => item.slug === game) || null;
+
+    if (selectedGame) {
+      productsQuery = productsQuery.eq("game_id", selectedGame.id);
+    } else {
+      filteredProductIds = [];
+    }
+  }
+
+  if (filteredProductIds) {
+    if (filteredProductIds.length === 0) {
+      productsQuery = productsQuery.in("id", ["00000000-0000-0000-0000-000000000000"]);
+    } else {
+      productsQuery = productsQuery.in("id", filteredProductIds);
+    }
+  }
+
+  if (sort === "trending") {
+    productsQuery = productsQuery
+      .order("featured", { ascending: false })
+      .order("purchase_count", { ascending: false })
+      .order("download_count", { ascending: false })
+      .order("rating_average", { ascending: false })
+      .order("updated_at", { ascending: false });
+  } else if (sort === "best_rated") {
+    productsQuery = productsQuery
+      .order("rating_average", { ascending: false })
+      .order("rating_count", { ascending: false })
+      .order("purchase_count", { ascending: false });
+  } else if (sort === "most_downloaded") {
+    productsQuery = productsQuery
+      .order("download_count", { ascending: false })
+      .order("purchase_count", { ascending: false })
+      .order("updated_at", { ascending: false });
+  } else if (sort === "updated") {
+    productsQuery = productsQuery.order("updated_at", { ascending: false });
+  } else if (sort === "price_asc") {
     productsQuery = productsQuery.order("price_cents", { ascending: true });
   } else if (sort === "price_desc") {
     productsQuery = productsQuery.order("price_cents", { ascending: false });
@@ -44,16 +130,43 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   }
 
   const { data: products } = await productsQuery;
-  const vendorIds = Array.from(new Set((products || []).map((product) => product.vendor_id)));
-  const { data: vendors } = vendorIds.length
-    ? await supabase.from("vendors").select("id, store_name").in("id", vendorIds)
-    : { data: [] };
 
-  const vendorById = new Map((vendors || []).map((vendor) => [vendor.id, vendor.store_name]));
+  const vendorIds = Array.from(new Set((products || []).map((product) => product.vendor_id)));
+  const categoryIds = Array.from(
+    new Set((products || []).map((product) => product.category_id).filter(Boolean))
+  );
+
+  const [vendorsResult, productCategoriesResult] = await Promise.all([
+    vendorIds.length > 0
+      ? supabase.from("vendors").select("id, store_name").in("id", vendorIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; store_name: string }> }),
+    categoryIds.length > 0
+      ? supabase.from("categories").select("id, name").in("id", categoryIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
+  ]);
+
+  const vendorById = new Map(
+    (vendorsResult.data || []).map((vendor) => [vendor.id, vendor.store_name])
+  );
+  const categoryById = new Map(
+    (productCategoriesResult.data || []).map((item) => [item.id, item.name])
+  );
 
   return (
     <main>
       <SiteHeaderServer />
+      <MarketplaceTracker
+        eventName="product.list.impression"
+        pageType="catalog"
+        metadata={{
+          query,
+          pricing,
+          sort,
+          game,
+          category,
+          resultCount: products?.length || 0,
+        }}
+      />
       <section className="container-shell py-16">
         <h1 className="text-3xl font-bold text-white">Productos</h1>
         <p className="mt-3 text-[var(--text-soft)]">
@@ -64,6 +177,17 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           initialSearch={query}
           initialPricing={pricing}
           initialSort={sort}
+          initialGame={game}
+          initialCategory={category}
+          games={(games || []).map((item) => ({
+            slug: item.slug,
+            name: item.name,
+          }))}
+          categories={(categories || []).map((item) => ({
+            slug: item.slug,
+            name: item.name,
+            parent_id: item.parent_id,
+          }))}
         />
 
         {products && products.length > 0 ? (
@@ -73,11 +197,22 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 key={product.id}
                 title={product.title}
                 author={vendorById.get(product.vendor_id) || "ForjaDev"}
-                category="Plugin"
-                price={product.is_free ? "Gratis" : `€${(product.price_cents / 100).toFixed(2)}`}
+                category={categoryById.get(product.category_id || "") || "Marketplace"}
+                price={product.is_free ? "Gratis" : `EUR ${(product.price_cents / 100).toFixed(2)}`}
                 compatibility={product.compatibility || "Rust"}
+                ratingAverage={product.rating_average}
+                ratingCount={product.rating_count}
                 href={`/products/${product.slug}`}
                 imageUrl={product.featured_image_url}
+                tracking={{
+                  pageType: "catalog",
+                  entityId: product.id,
+                  metadata: {
+                    source: "catalog",
+                    category: categoryById.get(product.category_id || "") || "Marketplace",
+                    game,
+                  },
+                }}
               />
             ))}
           </div>

@@ -80,6 +80,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
 
         <div className="mt-8 flex flex-wrap gap-3">
+          <Link href="/admin/analytics">
+            <Button variant="secondary">Analytics</Button>
+          </Link>
+          <Link href="/admin/support">
+            <Button variant="secondary">Support Ops</Button>
+          </Link>
           <Link href="/admin/licenses">
             <Button variant="secondary">Licencias</Button>
           </Link>

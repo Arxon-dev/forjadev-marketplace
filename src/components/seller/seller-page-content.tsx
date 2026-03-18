@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { SellerSales } from "./seller-sales";
 import { SellerStats } from "./seller-stats";
+import { SellerSupportQueue } from "./seller-support-queue";
 
 interface SellerPageProps {
   userId: string;
@@ -96,6 +97,12 @@ export function SellerPageContent({ userId }: SellerPageProps) {
         <h2 className="mb-6 text-xl font-semibold text-white">Ventas y licencias recientes</h2>
         <SellerSales vendorId={vendor?.id} />
       </div>
+
+      {vendor?.id ? (
+        <div className="mb-12">
+          <SellerSupportQueue vendorId={vendor.id} />
+        </div>
+      ) : null}
 
       <div>
         <h2 className="mb-6 text-xl font-semibold text-white">Mis productos</h2>

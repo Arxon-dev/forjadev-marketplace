@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   deleteProductFile,
@@ -14,6 +14,41 @@ import { FileUpload } from "@/components/ui/file-upload";
 interface ProductFormProps {
   productId?: string;
   onSuccess: () => void;
+}
+
+interface GameOption {
+  id: string;
+  name: string;
+  slug: string;
+  sort_order: number;
+}
+
+interface CategoryOption {
+  id: string;
+  name: string;
+  slug: string;
+  parent_id: string | null;
+  sort_order: number;
+}
+
+interface VendorSummary {
+  id: string;
+}
+
+interface LatestVersionSummary {
+  version: string;
+  fileName: string;
+  createdAt: string;
+}
+
+interface ProductFaqFormItem {
+  question: string;
+  answer: string;
+}
+
+interface ProductGuideFormItem {
+  title: string;
+  body: string;
 }
 
 function slugifyTitle(value: string) {
@@ -32,24 +67,33 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [shortDescription, setShortDescription] = useState("");
+  const [supportPolicy, setSupportPolicy] = useState("");
+  const [refundPolicy, setRefundPolicy] = useState("");
+  const [updatePolicy, setUpdatePolicy] = useState("");
   const [price, setPrice] = useState("0");
   const [isFree, setIsFree] = useState(true);
-  const [categoryId, setCategoryId] = useState("");
-  const [categories, setCategories] = useState<any[]>([]);
+  const [gameId, setGameId] = useState("");
+  const [primaryCategoryId, setPrimaryCategoryId] = useState("");
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [games, setGames] = useState<GameOption[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [featuredImageUrl, setFeaturedImageUrl] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [releaseVersion, setReleaseVersion] = useState("1.0.0");
   const [releaseChangelog, setReleaseChangelog] = useState("");
   const [releaseFile, setReleaseFile] = useState<File | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
-  const [latestVersion, setLatestVersion] = useState<{
-    version: string;
-    fileName: string;
-    createdAt: string;
-  } | null>(null);
+  const [latestVersion, setLatestVersion] = useState<LatestVersionSummary | null>(null);
+  const [faqItems, setFaqItems] = useState<ProductFaqFormItem[]>([{ question: "", answer: "" }]);
+  const [guideItems, setGuideItems] = useState<ProductGuideFormItem[]>([{ title: "", body: "" }]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [vendor, setVendor] = useState<any>(null);
+  const [vendor, setVendor] = useState<VendorSummary | null>(null);
+
+  const rootCategories = categories.filter((category) => category.parent_id === null);
+  const selectedCategoryOptions = categories.filter((category) =>
+    selectedCategoryIds.includes(category.id)
+  );
 
   const resolveUniqueSlug = async (rawTitle: string) => {
     const supabase = createClient();
@@ -60,7 +104,9 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
       .select("id, slug")
       .ilike("slug", `${baseSlug}%`);
 
-    if (slugError) throw slugError;
+    if (slugError) {
+      throw slugError;
+    }
 
     const usedSlugs = new Set(
       (existingProducts || [])
@@ -86,81 +132,234 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
   useEffect(() => {
     const fetchData = async () => {
       const supabase = createClient();
-      
-      // Obtiene categorías
-      const { data: categoriesData } = await supabase.from("categories").select("*");
-      setCategories(categoriesData || []);
 
-      // Obtiene vendor del usuario
-      const { data: { user } } = await supabase.auth.getUser();
+      const [{ data: categoriesData }, { data: gamesData }] = await Promise.all([
+        supabase
+          .from("categories")
+          .select("id, name, slug, parent_id, sort_order")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true })
+          .order("name", { ascending: true }),
+        supabase
+          .from("games")
+          .select("id, name, slug, sort_order")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true })
+          .order("name", { ascending: true }),
+      ]);
+
+      setCategories((categoriesData || []) as CategoryOption[]);
+      setGames((gamesData || []) as GameOption[]);
+
+      if (!productId && gamesData && gamesData.length > 0) {
+        setGameId((currentValue) => currentValue || gamesData[0].id);
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       if (user) {
         const { data: vendorData } = await supabase
           .from("vendors")
           .select("id")
           .eq("user_id", user.id)
           .single();
-        if (vendorData) setVendor(vendorData);
-      }
 
-      // Si es edición, carga los datos del producto
-      if (productId) {
-        const { data: productData } = await supabase
-          .from("products")
-          .select("*")
-          .eq("id", productId)
-          .single();
-
-        if (productData) {
-          setTitle(productData.title);
-          setDescription(productData.description);
-          setShortDescription(productData.short_description);
-          setPrice((productData.price_cents / 100).toString());
-          setIsFree(productData.is_free);
-          setCategoryId(productData.category_id || "");
-          setFeaturedImageUrl(productData.featured_image_url || "");
-        }
-
-        const { data: versionData } = await supabase
-          .from("product_versions")
-          .select("id, version, created_at")
-          .eq("product_id", productId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (versionData) {
-          const { data: fileData } = await supabase
-            .from("product_files")
-            .select("file_name")
-            .eq("product_version_id", versionData.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          setLatestVersion({
-            version: versionData.version,
-            fileName: fileData?.file_name || "Archivo disponible",
-            createdAt: versionData.created_at,
-          });
+        if (vendorData) {
+          setVendor(vendorData as VendorSummary);
         }
       }
+
+      if (!productId) {
+        return;
+      }
+
+      const { data: productData } = await supabase
+        .from("products")
+        .select("*")
+        .eq("id", productId)
+        .single();
+
+      if (productData) {
+        setTitle(productData.title);
+        setDescription(productData.description || "");
+        setShortDescription(productData.short_description || "");
+        setSupportPolicy(productData.support_policy || "");
+        setRefundPolicy(productData.refund_policy || "");
+        setUpdatePolicy(productData.update_policy || "");
+        setPrice((productData.price_cents / 100).toString());
+        setIsFree(productData.is_free);
+        setGameId(productData.game_id || "");
+        setPrimaryCategoryId(productData.category_id || "");
+        setFeaturedImageUrl(productData.featured_image_url || "");
+      }
+
+      const { data: productCategoryRows } = await supabase
+        .from("product_categories")
+        .select("category_id")
+        .eq("product_id", productId);
+
+      const { data: faqRows } = await supabase
+        .from("product_faqs")
+        .select("question, answer, sort_order")
+        .eq("product_id", productId)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      const { data: guideRows } = await supabase
+        .from("product_guides")
+        .select("title, body, sort_order")
+        .eq("product_id", productId)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      const mappedCategoryIds = (productCategoryRows || []).map((row) => row.category_id);
+
+      if (mappedCategoryIds.length > 0) {
+        setSelectedCategoryIds(mappedCategoryIds);
+        setPrimaryCategoryId((currentValue) => currentValue || mappedCategoryIds[0]);
+      } else if (productData?.category_id) {
+        setSelectedCategoryIds([productData.category_id]);
+      }
+
+      if (faqRows && faqRows.length > 0) {
+        setFaqItems(
+          faqRows.map((faq) => ({
+            question: faq.question,
+            answer: faq.answer,
+          }))
+        );
+      }
+
+      if (guideRows && guideRows.length > 0) {
+        setGuideItems(
+          guideRows.map((guide) => ({
+            title: guide.title,
+            body: guide.body,
+          }))
+        );
+      }
+
+      const { data: versionData } = await supabase
+        .from("product_versions")
+        .select("id, version, created_at")
+        .eq("product_id", productId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!versionData) {
+        return;
+      }
+
+      const { data: fileData } = await supabase
+        .from("product_files")
+        .select("file_name")
+        .eq("product_version_id", versionData.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      setLatestVersion({
+        version: versionData.version,
+        fileName: fileData?.file_name || "Archivo disponible",
+        createdAt: versionData.created_at,
+      });
     };
 
     fetchData();
   }, [productId]);
 
+  const toggleCategorySelection = (nextCategoryId: string, enabled: boolean) => {
+    setSelectedCategoryIds((currentValue) => {
+      const nextValue = enabled
+        ? Array.from(new Set([...currentValue, nextCategoryId]))
+        : currentValue.filter((categoryId) => categoryId !== nextCategoryId);
+
+      setPrimaryCategoryId((currentPrimary) => {
+        if (nextValue.length === 0) {
+          return "";
+        }
+
+        if (currentPrimary && nextValue.includes(currentPrimary)) {
+          return currentPrimary;
+        }
+
+        return nextValue[0];
+      });
+
+      return nextValue;
+    });
+  };
+
+  const updateFaqItem = (
+    index: number,
+    field: keyof ProductFaqFormItem,
+    value: string
+  ) => {
+    setFaqItems((currentValue) =>
+      currentValue.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              [field]: value,
+            }
+          : item
+      )
+    );
+  };
+
+  const addFaqItem = () => {
+    setFaqItems((currentValue) => [...currentValue, { question: "", answer: "" }]);
+  };
+
+  const removeFaqItem = (index: number) => {
+    setFaqItems((currentValue) => {
+      const nextValue = currentValue.filter((_, itemIndex) => itemIndex !== index);
+      return nextValue.length > 0 ? nextValue : [{ question: "", answer: "" }];
+    });
+  };
+
+  const updateGuideItem = (
+    index: number,
+    field: keyof ProductGuideFormItem,
+    value: string
+  ) => {
+    setGuideItems((currentValue) =>
+      currentValue.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              [field]: value,
+            }
+          : item
+      )
+    );
+  };
+
+  const addGuideItem = () => {
+    setGuideItems((currentValue) => [...currentValue, { title: "", body: "" }]);
+  };
+
+  const removeGuideItem = (index: number) => {
+    setGuideItems((currentValue) => {
+      const nextValue = currentValue.filter((_, itemIndex) => itemIndex !== index);
+      return nextValue.length > 0 ? nextValue : [{ title: "", body: "" }];
+    });
+  };
+
   const handleImageUpload = async (file: File) => {
-    if (!vendor) throw new Error("No tienes una tienda creada");
+    if (!vendor) {
+      throw new Error("No tienes una tienda creada");
+    }
 
     setUploadingImage(true);
+
     try {
       const supabase = createClient();
-      const { url } = await uploadProductImage(
-        supabase,
-        file,
-        vendor.id,
-        productId || "new"
-      );
+      const { url } = await uploadProductImage(supabase, file, vendor.id, productId || "new");
+
       setFeaturedImageUrl(url);
       setUploadingImage(false);
     } catch (err: unknown) {
@@ -180,13 +379,23 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
       return;
     }
 
+    if (!gameId) {
+      setError("Debes seleccionar un juego para el producto");
+      return;
+    }
+
+    if (selectedCategoryIds.length === 0) {
+      setError("Debes seleccionar al menos una categoria");
+      return;
+    }
+
     if (!productId && !releaseFile) {
       setError("Debes subir un ZIP para crear el producto");
       return;
     }
 
     if ((!productId || releaseFile) && !releaseVersion.trim()) {
-      setError("Debes indicar una versión para el archivo descargable");
+      setError("Debes indicar una version para el archivo descargable");
       return;
     }
 
@@ -194,11 +403,17 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
 
     try {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      if (!user) throw new Error("No autenticado");
+      if (!user) {
+        throw new Error("No autenticado");
+      }
 
-      if (!vendor) throw new Error("No tienes una tienda creada");
+      if (!vendor) {
+        throw new Error("No tienes una tienda creada");
+      }
 
       const slug = await resolveUniqueSlug(title);
 
@@ -208,37 +423,153 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
         slug,
         short_description: shortDescription,
         description,
+        support_policy: supportPolicy.trim() || null,
+        refund_policy: refundPolicy.trim() || null,
+        update_policy: updatePolicy.trim() || null,
         price_cents: isFree ? 0 : Math.round(parseFloat(price) * 100),
         is_free: isFree,
-        category_id: categoryId || null,
+        game_id: gameId,
+        category_id: primaryCategoryId || selectedCategoryIds[0] || null,
         featured_image_url: featuredImageUrl || null,
-        moderation_status: "pending",
+        moderation_status: "pending" as const,
       };
 
       let savedProductId = productId;
 
       if (productId) {
-        // Actualiza producto existente
         const { error: updateError } = await supabase
           .from("products")
           .update(productData)
           .eq("id", productId);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          throw updateError;
+        }
       } else {
-        // Crea nuevo producto
         const { data: insertedProduct, error: insertError } = await supabase
           .from("products")
           .insert([productData])
           .select("id")
           .single();
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          throw insertError;
+        }
+
         savedProductId = insertedProduct.id;
       }
 
       if (!savedProductId) {
         throw new Error("No se pudo resolver el producto guardado");
+      }
+
+      const { data: existingProductCategories, error: existingCategoriesError } = await supabase
+        .from("product_categories")
+        .select("category_id")
+        .eq("product_id", savedProductId);
+
+      if (existingCategoriesError) {
+        throw existingCategoriesError;
+      }
+
+      const existingCategoryIds = new Set(
+        (existingProductCategories || []).map((item) => item.category_id)
+      );
+      const nextCategoryIds = new Set(selectedCategoryIds);
+      const categoryIdsToInsert = selectedCategoryIds.filter(
+        (selectedId) => !existingCategoryIds.has(selectedId)
+      );
+      const categoryIdsToDelete = Array.from(existingCategoryIds).filter(
+        (existingId) => !nextCategoryIds.has(existingId)
+      );
+
+      if (categoryIdsToInsert.length > 0) {
+        const { error: insertCategoriesError } = await supabase
+          .from("product_categories")
+          .insert(
+            categoryIdsToInsert.map((selectedId) => ({
+              product_id: savedProductId,
+              category_id: selectedId,
+            }))
+          );
+
+        if (insertCategoriesError) {
+          throw insertCategoriesError;
+        }
+      }
+
+      if (categoryIdsToDelete.length > 0) {
+        const { error: deleteCategoriesError } = await supabase
+          .from("product_categories")
+          .delete()
+          .eq("product_id", savedProductId)
+          .in("category_id", categoryIdsToDelete);
+
+        if (deleteCategoriesError) {
+          throw deleteCategoriesError;
+        }
+      }
+
+      const normalizedFaqItems = faqItems
+        .map((item) => ({
+          question: item.question.trim(),
+          answer: item.answer.trim(),
+        }))
+        .filter((item) => item.question && item.answer);
+
+      const { error: deleteFaqsError } = await supabase
+        .from("product_faqs")
+        .delete()
+        .eq("product_id", savedProductId);
+
+      if (deleteFaqsError) {
+        throw deleteFaqsError;
+      }
+
+      if (normalizedFaqItems.length > 0) {
+        const { error: insertFaqsError } = await supabase.from("product_faqs").insert(
+          normalizedFaqItems.map((item, index) => ({
+            product_id: savedProductId,
+            question: item.question,
+            answer: item.answer,
+            sort_order: index,
+          }))
+        );
+
+        if (insertFaqsError) {
+          throw insertFaqsError;
+        }
+      }
+
+      const normalizedGuideItems = guideItems
+        .map((item) => ({
+          title: item.title.trim(),
+          body: item.body.trim(),
+        }))
+        .filter((item) => item.title && item.body);
+
+      const { error: deleteGuidesError } = await supabase
+        .from("product_guides")
+        .delete()
+        .eq("product_id", savedProductId);
+
+      if (deleteGuidesError) {
+        throw deleteGuidesError;
+      }
+
+      if (normalizedGuideItems.length > 0) {
+        const { error: insertGuidesError } = await supabase.from("product_guides").insert(
+          normalizedGuideItems.map((item, index) => ({
+            product_id: savedProductId,
+            title: item.title,
+            body: item.body,
+            sort_order: index,
+          }))
+        );
+
+        if (insertGuidesError) {
+          throw insertGuidesError;
+        }
       }
 
       if (releaseFile) {
@@ -256,7 +587,9 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
           .select("id")
           .single();
 
-        if (versionError) throw versionError;
+        if (versionError) {
+          throw versionError;
+        }
 
         let uploadedFilePath: string | null = null;
 
@@ -280,14 +613,15 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
             },
           ]);
 
-          if (fileRecordError) throw fileRecordError;
+          if (fileRecordError) {
+            throw fileRecordError;
+          }
         } catch (releaseError) {
           if (uploadedFilePath) {
             await deleteProductFile(supabase, uploadedFilePath).catch(() => undefined);
           }
 
           await supabase.from("product_versions").delete().eq("id", insertedVersion.id);
-
           throw releaseError;
         }
       }
@@ -305,11 +639,11 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
-      {error && (
+      {error ? (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
           {error}
         </div>
-      )}
+      ) : null}
 
       <div>
         <label className="block text-sm font-medium text-white">Imagen destacada</label>
@@ -323,7 +657,7 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
             successMessage="Imagen subida correctamente"
           />
         </div>
-        {featuredImageUrl && (
+        {featuredImageUrl ? (
           <div className="mt-4">
             <Image
               src={featuredImageUrl}
@@ -333,24 +667,24 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
               className="h-32 w-32 rounded-lg object-cover"
             />
           </div>
-        )}
+        ) : null}
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-white">
-              {productId ? "Nueva versión descargable" : "Archivo descargable"}
+              {productId ? "Nueva version descargable" : "Archivo descargable"}
             </h2>
             <p className="mt-1 text-sm text-[var(--text-soft)]">
               {productId
-                ? "Sube un nuevo ZIP para publicar una versión adicional de tu producto."
-                : "Sube el ZIP principal que los usuarios descargarán."}
+                ? "Sube un nuevo ZIP para publicar una version adicional de tu producto."
+                : "Sube el ZIP principal que los usuarios descargaran."}
             </p>
           </div>
           {latestVersion ? (
             <div className="text-right text-xs text-[var(--text-soft)]">
-              <p>Última versión: {latestVersion.version}</p>
+              <p>Ultima version: {latestVersion.version}</p>
               <p>{latestVersion.fileName}</p>
             </div>
           ) : null}
@@ -358,7 +692,7 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-white">Versión *</label>
+            <label className="block text-sm font-medium text-white">Version *</label>
             <input
               type="text"
               value={releaseVersion}
@@ -393,15 +727,73 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
             value={releaseChangelog}
             onChange={(e) => setReleaseChangelog(e.target.value)}
             className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
-            placeholder="Resume qué incluye esta versión"
+            placeholder="Resume que incluye esta version"
             rows={4}
             disabled={loading}
           />
         </div>
       </div>
 
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Guias y tutoriales</h2>
+            <p className="mt-1 text-sm text-[var(--text-soft)]">
+              Acompana la compra con instrucciones claras de instalacion, configuracion y uso.
+            </p>
+          </div>
+          <Button type="button" variant="secondary" onClick={addGuideItem} disabled={loading}>
+            Anadir guia
+          </Button>
+        </div>
+
+        <div className="mt-5 space-y-4">
+          {guideItems.map((item, index) => (
+            <div key={`guide-${index}`} className="rounded-2xl border border-white/10 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm font-semibold text-white">Guia {index + 1}</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => removeGuideItem(index)}
+                  disabled={loading || guideItems.length === 1}
+                >
+                  Eliminar
+                </Button>
+              </div>
+
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-white">Titulo</label>
+                  <input
+                    type="text"
+                    value={item.title}
+                    onChange={(e) => updateGuideItem(index, "title", e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+                    placeholder="Ejemplo: Instalacion rapida"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-white">Contenido</label>
+                  <textarea
+                    value={item.body}
+                    onChange={(e) => updateGuideItem(index, "body", e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+                    placeholder="Describe pasos, comandos, notas de configuracion y recomendaciones."
+                    rows={5}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div>
-        <label className="block text-sm font-medium text-white">Título *</label>
+        <label className="block text-sm font-medium text-white">Titulo *</label>
         <input
           type="text"
           value={title}
@@ -413,50 +805,149 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-white">
-          Descripción corta
-        </label>
+        <label className="block text-sm font-medium text-white">Descripcion corta</label>
         <input
           type="text"
           value={shortDescription}
           onChange={(e) => setShortDescription(e.target.value)}
           className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
-          placeholder="Una línea que resuma tu producto"
+          placeholder="Una linea que resuma tu producto"
           maxLength={160}
           disabled={loading}
         />
-        <p className="mt-1 text-xs text-[var(--text-soft)]">
-          {shortDescription.length}/160
-        </p>
+        <p className="mt-1 text-xs text-[var(--text-soft)]">{shortDescription.length}/160</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-white">
-          Descripción *
-        </label>
+        <label className="block text-sm font-medium text-white">Descripcion *</label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
-          placeholder="Descripción detallada del producto"
+          placeholder="Descripcion detallada del producto"
           rows={6}
           disabled={loading}
         />
       </div>
 
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+        <div>
+          <h2 className="text-lg font-semibold text-white">Trust y soporte</h2>
+          <p className="mt-1 text-sm text-[var(--text-soft)]">
+            Define expectativas claras para compradores y reduce friccion antes de la compra.
+          </p>
+        </div>
+
+        <div className="mt-5 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-white">Politica de soporte</label>
+            <textarea
+              value={supportPolicy}
+              onChange={(e) => setSupportPolicy(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+              placeholder="Ejemplo: Respondo tickets en 24-48h laborables y doy soporte de instalacion."
+              rows={3}
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-white">Politica de reembolso</label>
+            <textarea
+              value={refundPolicy}
+              onChange={(e) => setRefundPolicy(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+              placeholder="Ejemplo: Reembolsos solo si el producto no funciona segun la descripcion y no hay solucion razonable."
+              rows={3}
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-white">Politica de actualizaciones</label>
+            <textarea
+              value={updatePolicy}
+              onChange={(e) => setUpdatePolicy(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+              placeholder="Ejemplo: Incluye updates para el wipe actual y compatibilidad con cambios mayores de Rust."
+              rows={3}
+              disabled={loading}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Preguntas frecuentes</h2>
+            <p className="mt-1 text-sm text-[var(--text-soft)]">
+              Responde dudas recurrentes para aumentar conversion y reducir soporte repetitivo.
+            </p>
+          </div>
+          <Button type="button" variant="secondary" onClick={addFaqItem} disabled={loading}>
+            Anadir FAQ
+          </Button>
+        </div>
+
+        <div className="mt-5 space-y-4">
+          {faqItems.map((item, index) => (
+            <div key={`faq-${index}`} className="rounded-2xl border border-white/10 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm font-semibold text-white">FAQ {index + 1}</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => removeFaqItem(index)}
+                  disabled={loading || faqItems.length === 1}
+                >
+                  Eliminar
+                </Button>
+              </div>
+
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-white">Pregunta</label>
+                  <input
+                    type="text"
+                    value={item.question}
+                    onChange={(e) => updateFaqItem(index, "question", e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+                    placeholder="Ejemplo: Incluye configuracion editable?"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-white">Respuesta</label>
+                  <textarea
+                    value={item.answer}
+                    onChange={(e) => updateFaqItem(index, "answer", e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+                    placeholder="Explica la respuesta de forma clara y operativa."
+                    rows={3}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-white">Categoría</label>
+          <label className="block text-sm font-medium text-white">Juego *</label>
           <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
+            value={gameId}
+            onChange={(e) => setGameId(e.target.value)}
             className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white focus:border-white/30 focus:outline-none"
             disabled={loading}
           >
-            <option value="">Seleccionar categoría...</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
+            <option value="">Seleccionar juego...</option>
+            {games.map((game) => (
+              <option key={game.id} value={game.id}>
+                {game.name}
               </option>
             ))}
           </select>
@@ -473,7 +964,7 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
             />
             Es gratis
           </label>
-          {!isFree && (
+          {!isFree ? (
             <input
               type="number"
               value={price}
@@ -484,8 +975,88 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
               min="0"
               disabled={loading}
             />
-          )}
+          ) : null}
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Categorias</h2>
+            <p className="mt-1 text-sm text-[var(--text-soft)]">
+              Selecciona una categoria principal y, si encaja, subcategorias adicionales para
+              mejorar el discovery del producto.
+            </p>
+          </div>
+          <div className="text-right text-xs text-[var(--text-soft)]">
+            <p>{selectedCategoryIds.length} categorias seleccionadas</p>
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-4">
+          {rootCategories.map((rootCategory) => {
+            const childCategories = categories.filter(
+              (category) => category.parent_id === rootCategory.id
+            );
+
+            return (
+              <div key={rootCategory.id} className="rounded-2xl border border-white/10 p-4">
+                <label className="flex items-center gap-3 text-sm font-medium text-white">
+                  <input
+                    type="checkbox"
+                    checked={selectedCategoryIds.includes(rootCategory.id)}
+                    onChange={(e) =>
+                      toggleCategorySelection(rootCategory.id, e.target.checked)
+                    }
+                    disabled={loading}
+                    className="h-4 w-4 rounded border-white/10 bg-white/5"
+                  />
+                  {rootCategory.name}
+                </label>
+
+                {childCategories.length > 0 ? (
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    {childCategories.map((childCategory) => (
+                      <label
+                        key={childCategory.id}
+                        className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-[var(--text-soft)]"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedCategoryIds.includes(childCategory.id)}
+                          onChange={(e) =>
+                            toggleCategorySelection(childCategory.id, e.target.checked)
+                          }
+                          disabled={loading}
+                          className="h-4 w-4 rounded border-white/10 bg-white/5"
+                        />
+                        {childCategory.name}
+                      </label>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+
+        {selectedCategoryOptions.length > 0 ? (
+          <div className="mt-5">
+            <label className="block text-sm font-medium text-white">Categoria principal *</label>
+            <select
+              value={primaryCategoryId}
+              onChange={(e) => setPrimaryCategoryId(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white focus:border-white/30 focus:outline-none"
+              disabled={loading}
+            >
+              {selectedCategoryOptions.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
       </div>
 
       <Button

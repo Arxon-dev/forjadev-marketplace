@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export function Hero() {
@@ -11,11 +12,15 @@ export function Hero() {
           Publica, vende y descarga plugins, mapas y herramientas para servidores.
         </h1>
         <p className="mt-6 max-w-2xl text-base text-[var(--text-soft)] md:text-lg">
-          Empieza con Rust y prepara la plataforma para escalar a más juegos y categorías.
+          Empieza con Rust y prepara la plataforma para escalar a mas juegos y categorias.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Button>Explorar productos</Button>
-          <Button variant="secondary">Quiero vender</Button>
+          <Link href="/products">
+            <Button>Explorar productos</Button>
+          </Link>
+          <Link href="/seller">
+            <Button variant="secondary">Quiero vender</Button>
+          </Link>
         </div>
       </div>
     </section>

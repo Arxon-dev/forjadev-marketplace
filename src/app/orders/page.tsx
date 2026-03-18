@@ -66,14 +66,24 @@ export default async function OrdersPage() {
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <span className="text-[var(--text-soft)]">{item.product?.title}</span>
-                          {item.product?.slug ? (
-                            <Link
-                              href={`/products/${item.product.slug}`}
-                              className="text-sm font-medium text-white hover:underline"
-                            >
-                              Ver producto
-                            </Link>
-                          ) : null}
+                          <div className="flex flex-wrap gap-3">
+                            {item.product?.slug ? (
+                              <Link
+                                href={`/products/${item.product.slug}`}
+                                className="text-sm font-medium text-white hover:underline"
+                              >
+                                Ver producto
+                              </Link>
+                            ) : null}
+                            {item.product?.id ? (
+                              <Link
+                                href={`/support?product=${item.product.id}`}
+                                className="text-sm font-medium text-[var(--primary)] hover:underline"
+                              >
+                                Abrir soporte
+                              </Link>
+                            ) : null}
+                          </div>
                         </div>
 
                         {license ? (

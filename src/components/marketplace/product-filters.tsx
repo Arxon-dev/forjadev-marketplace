@@ -3,11 +3,23 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { trackMarketplaceEvent } from "@/lib/analytics/marketplace";
 
 interface ProductFiltersProps {
   initialSearch: string;
   initialPricing: string;
   initialSort: string;
+  initialGame: string;
+  initialCategory: string;
+  games: Array<{
+    slug: string;
+    name: string;
+  }>;
+  categories: Array<{
+    slug: string;
+    name: string;
+    parent_id: string | null;
+  }>;
 }
 
 const pricingOptions = [
@@ -18,6 +30,10 @@ const pricingOptions = [
 
 const sortOptions = [
   { value: "newest", label: "Mas recientes" },
+  { value: "updated", label: "Recien actualizados" },
+  { value: "trending", label: "Tendencia" },
+  { value: "best_rated", label: "Mejor valorados" },
+  { value: "most_downloaded", label: "Mas descargados" },
   { value: "price_asc", label: "Precio ascendente" },
   { value: "price_desc", label: "Precio descendente" },
   { value: "title", label: "Titulo" },
@@ -27,6 +43,10 @@ export function ProductFilters({
   initialSearch,
   initialPricing,
   initialSort,
+  initialGame,
+  initialCategory,
+  games,
+  categories,
 }: ProductFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -36,6 +56,29 @@ export function ProductFilters({
 
   const pushParams = (updates: Record<string, string>) => {
     const params = new URLSearchParams(searchParams.toString());
+    const trackingMetadata = {
+      search: "q" in updates ? updates.q || "" : initialSearch,
+      pricing: "pricing" in updates ? updates.pricing || "all" : initialPricing,
+      sort: "sort" in updates ? updates.sort || "newest" : initialSort,
+      game: "game" in updates ? updates.game || "all" : initialGame,
+      category: "category" in updates ? updates.category || "all" : initialCategory,
+    };
+
+    if ("q" in updates && (updates.q || "").trim()) {
+      trackMarketplaceEvent({
+        eventName: "search.executed",
+        pageType: "catalog",
+        metadata: trackingMetadata,
+      });
+    }
+
+    if (["pricing", "sort", "game", "category"].some((key) => key in updates)) {
+      trackMarketplaceEvent({
+        eventName: "filter.applied",
+        pageType: "catalog",
+        metadata: trackingMetadata,
+      });
+    }
 
     Object.entries(updates).forEach(([key, value]) => {
       if (!value || value === "all") {
@@ -65,7 +108,7 @@ export function ProductFilters({
               }
             }}
             className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
-            placeholder="Buscar por titulo..."
+            placeholder="Buscar por titulo, descripcion o compatibilidad..."
           />
           <Button
             type="button"
@@ -87,6 +130,42 @@ export function ProductFilters({
           >
             Limpiar
           </Button>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <div>
+          <p className="mb-3 text-sm font-medium text-white">Juego</p>
+          <select
+            value={initialGame}
+            onChange={(e) => pushParams({ game: e.target.value })}
+            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-white/30 focus:outline-none"
+            disabled={isPending}
+          >
+            <option value="all">Todos los juegos</option>
+            {games.map((game) => (
+              <option key={game.slug} value={game.slug}>
+                {game.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <p className="mb-3 text-sm font-medium text-white">Categoria</p>
+          <select
+            value={initialCategory}
+            onChange={(e) => pushParams({ category: e.target.value })}
+            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-white/30 focus:outline-none"
+            disabled={isPending}
+          >
+            <option value="all">Todas las categorias</option>
+            {categories.map((category) => (
+              <option key={category.slug} value={category.slug}>
+                {category.parent_id ? `- ${category.name}` : category.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
