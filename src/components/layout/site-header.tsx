@@ -37,6 +37,9 @@ export function SiteHeader({
           <Link href="/products" className="text-sm text-[var(--text-soft)] hover:text-white">
             Productos
           </Link>
+          <Link href="/collections" className="text-sm text-[var(--text-soft)] hover:text-white">
+            Colecciones
+          </Link>
           <Link href="/seller" className="text-sm text-[var(--text-soft)] hover:text-white">
             Vender
           </Link>
@@ -46,8 +49,18 @@ export function SiteHeader({
             </Link>
           ) : null}
           {user ? (
+            <Link href="/feed" className="text-sm text-[var(--text-soft)] hover:text-white">
+              Actividad
+            </Link>
+          ) : null}
+          {user ? (
             <Link href="/orders" className="text-sm text-[var(--text-soft)] hover:text-white">
               Pedidos
+            </Link>
+          ) : null}
+          {user ? (
+            <Link href="/disputes" className="text-sm text-[var(--text-soft)] hover:text-white">
+              Disputas
             </Link>
           ) : null}
           {user ? (

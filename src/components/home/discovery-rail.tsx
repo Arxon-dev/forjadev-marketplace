@@ -6,6 +6,8 @@ interface RailProduct {
   author: string;
   category: string;
   price: string;
+  originalPrice?: string | null;
+  promoLabel?: string | null;
   compatibility: string;
   ratingAverage?: number | null;
   ratingCount?: number;
@@ -13,6 +15,7 @@ interface RailProduct {
   imageUrl?: string | null;
   tracking?: {
     pageType: string;
+    entityType?: string;
     entityId: string;
     metadata?: Record<string, unknown> | null;
   };
@@ -50,6 +53,8 @@ export function DiscoveryRail({
             author={product.author}
             category={product.category}
             price={product.price}
+            originalPrice={product.originalPrice}
+            promoLabel={product.promoLabel}
             compatibility={product.compatibility}
             ratingAverage={product.ratingAverage}
             ratingCount={product.ratingCount}

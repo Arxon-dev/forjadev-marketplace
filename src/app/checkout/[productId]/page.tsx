@@ -6,10 +6,12 @@ import { createClient } from "@/lib/supabase/server";
 
 interface Props {
   params: Promise<{ productId: string }>;
+  searchParams?: Promise<{ coupon?: string }>;
 }
 
-export default async function CheckoutPage({ params }: Props) {
+export default async function CheckoutPage({ params, searchParams }: Props) {
   const { productId } = await params;
+  const resolvedSearchParams = (await searchParams) || {};
   const supabase = await createClient();
   const {
     data: { user },
@@ -80,6 +82,12 @@ export default async function CheckoutPage({ params }: Props) {
                   {product.is_free ? "Gratis" : `EUR ${(product.price_cents / 100).toFixed(2)}`}
                 </span>
               </p>
+              {resolvedSearchParams.coupon ? (
+                <p>
+                  Cupon sugerido:{" "}
+                  <span className="text-white">{resolvedSearchParams.coupon.toUpperCase()}</span>
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -130,7 +138,12 @@ export default async function CheckoutPage({ params }: Props) {
                 <p className="text-[var(--text-soft)]">
                   Esta version del checkout crea una orden completada en tu biblioteca y desbloquea la descarga.
                 </p>
-                <CheckoutButton productId={product.id} />
+                <CheckoutButton
+                  productId={product.id}
+                  productPriceCents={product.price_cents}
+                  currency={product.currency || "EUR"}
+                  initialCouponCode={resolvedSearchParams.coupon || ""}
+                />
               </div>
             )}
           </div>

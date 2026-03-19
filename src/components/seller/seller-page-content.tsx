@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { SellerAnalyticsPanel } from "./seller-analytics-panel";
+import { SellerCampaignManager } from "./seller-campaign-manager";
 import { SellerSales } from "./seller-sales";
 import { SellerStats } from "./seller-stats";
+import { SellerStoreProfileForm } from "./seller-store-profile-form";
 import { SellerSupportQueue } from "./seller-support-queue";
 
 interface SellerPageProps {
@@ -15,6 +18,7 @@ interface SellerPageProps {
 export function SellerPageContent({ userId }: SellerPageProps) {
   const [vendor, setVendor] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
+  const [bundles, setBundles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSeller, setIsSeller] = useState(false);
 
@@ -40,13 +44,21 @@ export function SellerPageContent({ userId }: SellerPageProps) {
         if (vendorData) {
           setVendor(vendorData);
 
-          const { data: productsData } = await supabase
-            .from("products")
-            .select("*")
-            .eq("vendor_id", vendorData.id)
-            .order("created_at", { ascending: false });
+          const [{ data: productsData }, { data: bundlesData }] = await Promise.all([
+            supabase
+              .from("products")
+              .select("*")
+              .eq("vendor_id", vendorData.id)
+              .order("created_at", { ascending: false }),
+            supabase
+              .from("bundles")
+              .select("*")
+              .eq("vendor_id", vendorData.id)
+              .order("updated_at", { ascending: false }),
+          ]);
 
           setProducts(productsData || []);
+          setBundles(bundlesData || []);
         }
       }
 
@@ -83,15 +95,43 @@ export function SellerPageContent({ userId }: SellerPageProps) {
           <h1 className="text-3xl font-bold text-white">{vendor?.store_name}</h1>
           <p className="mt-2 text-[var(--text-soft)]">{vendor?.bio}</p>
         </div>
-        <Link href="/seller/new">
-          <Button>Nuevo producto</Button>
-        </Link>
+        <div className="flex gap-3">
+          <Link href="/seller/bundles/new">
+            <Button variant="secondary">Nuevo bundle</Button>
+          </Link>
+          <Link href="/seller/new">
+            <Button>Nuevo producto</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="mb-12">
         <h2 className="mb-6 text-xl font-semibold text-white">Estadisticas</h2>
         <SellerStats vendorId={vendor?.id} />
       </div>
+
+      {vendor ? (
+        <div className="mb-12">
+          <SellerStoreProfileForm
+            vendor={vendor}
+            onUpdated={(updates) =>
+              setVendor((current: any) => (current ? { ...current, ...updates } : current))
+            }
+          />
+        </div>
+      ) : null}
+
+      {vendor?.id ? (
+        <div className="mb-12">
+          <SellerAnalyticsPanel vendorId={vendor.id} />
+        </div>
+      ) : null}
+
+      {vendor?.id ? (
+        <div className="mb-12">
+          <SellerCampaignManager vendorId={vendor.id} />
+        </div>
+      ) : null}
 
       <div className="mb-12">
         <h2 className="mb-6 text-xl font-semibold text-white">Ventas y licencias recientes</h2>
@@ -134,6 +174,45 @@ export function SellerPageContent({ userId }: SellerPageProps) {
                 <Link href={`/seller/${product.id}/edit`}>
                   <Button variant="ghost">Editar</Button>
                 </Link>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-12">
+        <h2 className="mb-6 text-xl font-semibold text-white">Mis bundles</h2>
+        {bundles.length === 0 ? (
+          <div className="rounded-lg border border-white/10 bg-white/5 px-8 py-12 text-center backdrop-blur">
+            <p className="text-[var(--text-soft)]">Aun no has creado bundles.</p>
+            <Link href="/seller/bundles/new" className="mt-4 inline-block">
+              <Button variant="secondary">Crear primer bundle</Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {bundles.map((bundle) => (
+              <div
+                key={bundle.id}
+                className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-4 backdrop-blur"
+              >
+                <div>
+                  <h3 className="font-semibold text-white">{bundle.title}</h3>
+                  <p className="text-sm text-[var(--text-soft)]">
+                    Estado: <span className="capitalize">{bundle.is_active ? "activo" : "inactivo"}</span>
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--text-soft)]">
+                    Precio: EUR {(bundle.price_cents / 100).toFixed(2)}
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <Link href={`/bundles/${bundle.slug}`}>
+                    <Button variant="ghost">Ver</Button>
+                  </Link>
+                  <Link href={`/seller/bundles/${bundle.id}/edit`}>
+                    <Button variant="ghost">Editar</Button>
+                  </Link>
+                </div>
               </div>
             ))}
           </div>

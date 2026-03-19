@@ -51,6 +51,16 @@ interface ProductGuideFormItem {
   body: string;
 }
 
+interface ProductCouponFormItem {
+  code: string;
+  discountType: "percent" | "fixed";
+  discountValue: string;
+  startsAt: string;
+  endsAt: string;
+  maxRedemptions: string;
+  isActive: boolean;
+}
+
 function slugifyTitle(value: string) {
   return value
     .toLowerCase()
@@ -86,6 +96,17 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
   const [latestVersion, setLatestVersion] = useState<LatestVersionSummary | null>(null);
   const [faqItems, setFaqItems] = useState<ProductFaqFormItem[]>([{ question: "", answer: "" }]);
   const [guideItems, setGuideItems] = useState<ProductGuideFormItem[]>([{ title: "", body: "" }]);
+  const [couponItems, setCouponItems] = useState<ProductCouponFormItem[]>([
+    {
+      code: "",
+      discountType: "percent",
+      discountValue: "",
+      startsAt: "",
+      endsAt: "",
+      maxRedemptions: "",
+      isActive: true,
+    },
+  ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [vendor, setVendor] = useState<VendorSummary | null>(null);
@@ -214,6 +235,14 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true });
 
+      const { data: couponRows } = await supabase
+        .from("coupons")
+        .select(
+          "code, discount_type, discount_value, starts_at, ends_at, max_redemptions, is_active, created_at"
+        )
+        .eq("product_id", productId)
+        .order("created_at", { ascending: false });
+
       const mappedCategoryIds = (productCategoryRows || []).map((row) => row.category_id);
 
       if (mappedCategoryIds.length > 0) {
@@ -237,6 +266,23 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
           guideRows.map((guide) => ({
             title: guide.title,
             body: guide.body,
+          }))
+        );
+      }
+
+      if (couponRows && couponRows.length > 0) {
+        setCouponItems(
+          couponRows.map((coupon) => ({
+            code: coupon.code,
+            discountType: coupon.discount_type,
+            discountValue:
+              coupon.discount_type === "fixed"
+                ? (coupon.discount_value / 100).toFixed(2)
+                : String(coupon.discount_value),
+            startsAt: coupon.starts_at ? coupon.starts_at.slice(0, 16) : "",
+            endsAt: coupon.ends_at ? coupon.ends_at.slice(0, 16) : "",
+            maxRedemptions: coupon.max_redemptions ? String(coupon.max_redemptions) : "",
+            isActive: coupon.is_active,
           }))
         );
       }
@@ -346,6 +392,57 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
     setGuideItems((currentValue) => {
       const nextValue = currentValue.filter((_, itemIndex) => itemIndex !== index);
       return nextValue.length > 0 ? nextValue : [{ title: "", body: "" }];
+    });
+  };
+
+  const updateCouponItem = (
+    index: number,
+    field: keyof ProductCouponFormItem,
+    value: string | boolean
+  ) => {
+    setCouponItems((currentValue) =>
+      currentValue.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              [field]: value,
+            }
+          : item
+      )
+    );
+  };
+
+  const addCouponItem = () => {
+    setCouponItems((currentValue) => [
+      ...currentValue,
+      {
+        code: "",
+        discountType: "percent",
+        discountValue: "",
+        startsAt: "",
+        endsAt: "",
+        maxRedemptions: "",
+        isActive: true,
+      },
+    ]);
+  };
+
+  const removeCouponItem = (index: number) => {
+    setCouponItems((currentValue) => {
+      const nextValue = currentValue.filter((_, itemIndex) => itemIndex !== index);
+      return nextValue.length > 0
+        ? nextValue
+        : [
+            {
+              code: "",
+              discountType: "percent",
+              discountValue: "",
+              startsAt: "",
+              endsAt: "",
+              maxRedemptions: "",
+              isActive: true,
+            },
+          ];
     });
   };
 
@@ -572,6 +669,50 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
         }
       }
 
+      const normalizedCoupons = couponItems
+        .map((item) => ({
+          code: item.code.trim().toUpperCase(),
+          discount_type: item.discountType,
+          discount_value:
+            item.discountType === "fixed"
+              ? Math.round(parseFloat(item.discountValue || "0") * 100)
+              : Math.round(parseFloat(item.discountValue || "0")),
+          starts_at: item.startsAt ? new Date(item.startsAt).toISOString() : null,
+          ends_at: item.endsAt ? new Date(item.endsAt).toISOString() : null,
+          max_redemptions: item.maxRedemptions ? parseInt(item.maxRedemptions, 10) : null,
+          is_active: item.isActive,
+        }))
+        .filter((item) => item.code && item.discount_value > 0);
+
+      const { error: deleteCouponsError } = await supabase
+        .from("coupons")
+        .delete()
+        .eq("product_id", savedProductId);
+
+      if (deleteCouponsError) {
+        throw deleteCouponsError;
+      }
+
+      if (normalizedCoupons.length > 0) {
+        const { error: insertCouponsError } = await supabase.from("coupons").insert(
+          normalizedCoupons.map((coupon) => ({
+            vendor_id: vendor.id,
+            product_id: savedProductId,
+            code: coupon.code,
+            discount_type: coupon.discount_type,
+            discount_value: coupon.discount_value,
+            starts_at: coupon.starts_at,
+            ends_at: coupon.ends_at,
+            max_redemptions: coupon.max_redemptions,
+            is_active: coupon.is_active,
+          }))
+        );
+
+        if (insertCouponsError) {
+          throw insertCouponsError;
+        }
+      }
+
       if (releaseFile) {
         setUploadingFile(true);
 
@@ -731,6 +872,129 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
             rows={4}
             disabled={loading}
           />
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Cupones</h2>
+            <p className="mt-1 text-sm text-[var(--text-soft)]">
+              Crea descuentos por producto para lanzamientos, promociones puntuales o comunidad.
+            </p>
+          </div>
+          <Button type="button" variant="secondary" onClick={addCouponItem} disabled={loading}>
+            Anadir cupon
+          </Button>
+        </div>
+
+        <div className="mt-5 space-y-4">
+          {couponItems.map((item, index) => (
+            <div key={`coupon-${index}`} className="rounded-2xl border border-white/10 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm font-semibold text-white">Cupon {index + 1}</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => removeCouponItem(index)}
+                  disabled={loading || couponItems.length === 1}
+                >
+                  Eliminar
+                </Button>
+              </div>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-white">Codigo</label>
+                  <input
+                    type="text"
+                    value={item.code}
+                    onChange={(e) => updateCouponItem(index, "code", e.target.value.toUpperCase())}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+                    placeholder="PROMO10"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-white">Tipo de descuento</label>
+                  <select
+                    value={item.discountType}
+                    onChange={(e) =>
+                      updateCouponItem(index, "discountType", e.target.value as "percent" | "fixed")
+                    }
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white focus:border-white/30 focus:outline-none"
+                    disabled={loading}
+                  >
+                    <option value="percent">Porcentaje</option>
+                    <option value="fixed">Importe fijo</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-white">
+                    {item.discountType === "fixed" ? "Descuento en EUR" : "Descuento en %"}
+                  </label>
+                  <input
+                    type="number"
+                    value={item.discountValue}
+                    onChange={(e) => updateCouponItem(index, "discountValue", e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+                    placeholder={item.discountType === "fixed" ? "5.00" : "10"}
+                    step={item.discountType === "fixed" ? "0.01" : "1"}
+                    min="0"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-white">Maximo de usos</label>
+                  <input
+                    type="number"
+                    value={item.maxRedemptions}
+                    onChange={(e) => updateCouponItem(index, "maxRedemptions", e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+                    placeholder="Sin limite"
+                    min="1"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-white">Inicio</label>
+                  <input
+                    type="datetime-local"
+                    value={item.startsAt}
+                    onChange={(e) => updateCouponItem(index, "startsAt", e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white focus:border-white/30 focus:outline-none"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-white">Fin</label>
+                  <input
+                    type="datetime-local"
+                    value={item.endsAt}
+                    onChange={(e) => updateCouponItem(index, "endsAt", e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white focus:border-white/30 focus:outline-none"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <label className="mt-4 flex items-center gap-2 text-sm font-medium text-white">
+                <input
+                  type="checkbox"
+                  checked={item.isActive}
+                  onChange={(e) => updateCouponItem(index, "isActive", e.target.checked)}
+                  disabled={loading}
+                  className="h-4 w-4 rounded border-white/10 bg-white/5"
+                />
+                Cupon activo
+              </label>
+            </div>
+          ))}
         </div>
       </div>
 

@@ -10,6 +10,10 @@ export function OnboardingForm() {
   const [storeName, setStoreName] = useState("");
   const [slug, setSlug] = useState("");
   const [bio, setBio] = useState("");
+  const [discordUrl, setDiscordUrl] = useState("");
+  const [steamUrl, setSteamUrl] = useState("");
+  const [xUrl, setXUrl] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -40,6 +44,10 @@ export function OnboardingForm() {
             store_name: storeName,
             slug: slug.toLowerCase().replace(/\s+/g, "-"),
             bio,
+            discord_url: discordUrl || null,
+            steam_url: steamUrl || null,
+            x_url: xUrl || null,
+            website_url: websiteUrl || null,
           },
         ])
         .select()
@@ -130,6 +138,56 @@ export function OnboardingForm() {
               rows={4}
               disabled={loading}
             />
+          </div>
+
+          <div className="grid gap-4">
+            <div>
+              <label className="block text-sm font-medium text-white">Discord</label>
+              <input
+                type="url"
+                value={discordUrl}
+                onChange={(e) => setDiscordUrl(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+                placeholder="https://discord.gg/tu-comunidad"
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white">Steam</label>
+              <input
+                type="url"
+                value={steamUrl}
+                onChange={(e) => setSteamUrl(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+                placeholder="https://steamcommunity.com/id/tu-perfil"
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white">X / Twitter</label>
+              <input
+                type="url"
+                value={xUrl}
+                onChange={(e) => setXUrl(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+                placeholder="https://x.com/tu-cuenta"
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white">Web</label>
+              <input
+                type="url"
+                value={websiteUrl}
+                onChange={(e) => setWebsiteUrl(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+                placeholder="https://tu-sitio.dev"
+                disabled={loading}
+              />
+            </div>
           </div>
 
           <Button type="submit" disabled={loading} className="w-full">

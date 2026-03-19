@@ -3,6 +3,7 @@
 ## Core tables
 - profiles
 - vendors
+- user_provider_identities
 - seller_reputation_snapshots
 - seller_badges
 - games
@@ -19,7 +20,23 @@
 - downloads
 - support_tickets
 - support_messages
+- product_discussions
+- discussion_messages
+- collections
+- collection_items
+- wishlists
+- seller_followers
+- coupons
+- bundles
+- bundle_products
 - user_notifications
+- risk_events
+- moderation_flags
+- license_anomalies
+- disputes
+- product_risk_snapshots
+- seller_risk_snapshots
+- product_analytics_daily
 - licenses
 - audit_logs
 - marketplace_events
@@ -37,13 +54,32 @@
 - `products.support_policy`, `products.refund_policy` and `products.update_policy` expose trust and support expectations directly on the product page
 - `product_faqs` stores public FAQ entries per product and is editable only by the owning seller
 - `product_guides` stores installation guides, setup notes and post-sale tutorials attached to each product
+- `coupons` stores seller-managed discounts scoped to a product, with activation windows and redemption caps
+- `campaigns` stores time-bound commercial promotions such as flash deals, launch discounts and featured placements for products or bundles
+- `bundles` stores seller-managed multi-product offers with their own public slug, media and commercial pricing
+- `bundle_products` maps each bundle to the ordered list of included products
 - `marketplace_events` captures lightweight discovery analytics such as impressions, clicks, searches, filter usage and visits to game/category/product pages
+- `product_analytics_daily` persists daily aggregates for views, clicks, add-to-cart intent, purchases, downloads and revenue so seller analytics and ranking logic can read stable snapshots instead of raw events
 - `seller_reputation_snapshots` persists public seller trust metrics such as approved products, downloads, purchases, ratings and reputation score
 - `seller_badges` stores public seller badges derived from the reputation snapshot and curated for marketplace trust surfaces
+- `vendors` now stores public ecosystem links such as Discord, Steam, X and website URLs for seller storefronts
+- `user_provider_identities` stores provider mappings for Discord and Steam identities linked through Supabase Auth
 - product metrics and seller trust snapshots are automatically refreshed by database triggers when products, reviews, downloads, order items or order status change
 - `support_tickets` stores buyer-seller support threads scoped to a product and seller
 - `support_messages` stores the conversation history for each ticket and automatically updates ticket activity timestamps
+- `product_discussions` stores public community threads attached to approved product pages
+- `discussion_messages` stores replies inside each public product discussion and refreshes thread activity timestamps
+- `collections` stores public or private user-curated lists of products for discovery and recurring engagement
+- `collection_items` stores the ordered list of approved products included in each user collection
+- `wishlists` stores buyer-saved products for later evaluation and re-engagement
+- `seller_followers` stores the lightweight social graph between buyers and seller storefronts
 - `user_notifications` stores internal inbox-style notifications for buyers, sellers and admins, including support activity and linked entities
+- `risk_events` stores admin-facing risk signals for products, licenses and users, with severity and status
+- `moderation_flags` stores active moderation attention markers that can prioritize the review queue
+- `license_anomalies` stores suspicious license/download patterns such as bursts and revocations
+- `disputes` stores the buyer/admin dispute workflow and can now be opened from completed orders and moved by admins through review, resolution or rejection
+- `product_risk_snapshots` persists a normalized operational risk score per product for moderation prioritization
+- `seller_risk_snapshots` persists a normalized operational risk score per seller for admin risk triage and intelligence weighting
 - published product releases generate buyer notifications automatically when a new product file is attached to a version for an approved product
 
 ## Security notes
@@ -53,6 +89,9 @@
 - licenses only visible to the owning user
 - license inserts must match the buyer's own `order_item` and its `product_id`
 - checkout creation runs through a transactional database function to avoid partial orders and duplicate purchases under race conditions
+- product checkout automatically resolves the best active commercial promotion between campaign and coupon without stacking discounts
+- bundle checkout also runs through a transactional database function that creates a single order with multiple order items and issues licenses where needed
+- bundle checkout can apply an active bundle campaign transactionally inside the database function
 - checkout audit logging is emitted inside the transactional database function so RPC callers and Next.js callers behave consistently
 - critical actions such as moderation, checkout completion and download generation are recorded in `audit_logs`
 - auth profile creation is backed by both an `auth.users` trigger and an `ensure_profile_exists()` repair function for resilience

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { ModerationStatusPill } from "@/components/admin/moderation-status-pill";
+import { RiskScoreMeter } from "@/components/admin/risk-score-meter";
+import { RiskSeverityPill } from "@/components/admin/risk-severity-pill";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { Button } from "@/components/ui/button";
 import { requireAdminContext } from "@/lib/auth/admin";
@@ -33,12 +35,33 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     .select("moderation_status")
     .neq("moderation_status", "approved");
 
+  const productIds = (products || []).map((product) => product.id);
+
   const vendorIds = Array.from(new Set((products || []).map((product) => product.vendor_id)));
-  const { data: vendors } = vendorIds.length
-    ? await supabase.from("vendors").select("id, store_name").in("id", vendorIds)
-    : { data: [] };
+  const [{ data: vendors }, { data: flags }, { data: riskSnapshots }] = await Promise.all([
+    vendorIds.length
+      ? supabase.from("vendors").select("id, store_name").in("id", vendorIds)
+      : Promise.resolve({ data: [] }),
+    productIds.length
+      ? supabase
+          .from("moderation_flags")
+          .select("product_id, severity, is_active")
+          .in("product_id", productIds)
+          .eq("is_active", true)
+      : Promise.resolve({ data: [] }),
+    productIds.length
+      ? supabase
+          .from("product_risk_snapshots")
+          .select("product_id, risk_score")
+          .in("product_id", productIds)
+      : Promise.resolve({ data: [] }),
+  ]);
 
   const vendorById = new Map((vendors || []).map((vendor) => [vendor.id, vendor.store_name]));
+  const flagByProductId = new Map((flags || []).map((flag) => [flag.product_id, flag]));
+  const riskScoreByProductId = new Map(
+    (riskSnapshots || []).map((snapshot) => [snapshot.product_id, snapshot.risk_score])
+  );
   const counts = {
     pending: (allQueueProducts || []).filter((product) => product.moderation_status === "pending").length,
     draft: (allQueueProducts || []).filter((product) => product.moderation_status === "draft").length,
@@ -83,8 +106,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <Link href="/admin/analytics">
             <Button variant="secondary">Analytics</Button>
           </Link>
+          <Link href="/admin/campaigns">
+            <Button variant="secondary">Campaign Ops</Button>
+          </Link>
           <Link href="/admin/support">
             <Button variant="secondary">Support Ops</Button>
+          </Link>
+          <Link href="/admin/risk">
+            <Button variant="secondary">Risk Ops</Button>
           </Link>
           <Link href="/admin/licenses">
             <Button variant="secondary">Licencias</Button>
@@ -121,8 +150,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <p className="mt-1 text-sm text-[var(--text-soft)]">
                     Seller: {vendorById.get(product.vendor_id) || "Tienda"}
                   </p>
-                  <div className="mt-3">
+                  <div className="mt-3 max-w-sm">
+                    <RiskScoreMeter
+                      score={riskScoreByProductId.get(product.id) || 0}
+                      label="Riesgo operativo"
+                      compact
+                    />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
                     <ModerationStatusPill status={product.moderation_status} />
+                    {flagByProductId.get(product.id) ? (
+                      <RiskSeverityPill
+                        severity={flagByProductId.get(product.id)?.severity || "low"}
+                      />
+                    ) : null}
                   </div>
                   {product.rejection_reason ? (
                     <p className="mt-2 text-sm text-amber-300">

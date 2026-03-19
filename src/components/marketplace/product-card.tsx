@@ -11,6 +11,8 @@ interface ProductCardProps {
   author: string;
   category: string;
   price: string;
+  originalPrice?: string | null;
+  promoLabel?: string | null;
   compatibility: string;
   ratingAverage?: number | null;
   ratingCount?: number;
@@ -18,6 +20,7 @@ interface ProductCardProps {
   imageUrl?: string | null;
   tracking?: {
     pageType: string;
+    entityType?: string;
     entityId: string;
     metadata?: Record<string, unknown> | null;
   };
@@ -28,6 +31,8 @@ export function ProductCard({
   author,
   category,
   price,
+  originalPrice = null,
+  promoLabel = null,
   compatibility,
   ratingAverage = null,
   ratingCount = 0,
@@ -53,8 +58,18 @@ export function ProductCard({
           <h3 className="text-base font-semibold text-white">{title}</h3>
           <p className="mt-1 text-sm text-[var(--text-soft)]">por {author}</p>
         </div>
-        <Badge>{price}</Badge>
+        <div className="text-right">
+          <Badge>{price}</Badge>
+          {originalPrice ? (
+            <p className="mt-2 text-xs text-[var(--text-soft)] line-through">{originalPrice}</p>
+          ) : null}
+        </div>
       </div>
+      {promoLabel ? (
+        <div className="mt-3">
+          <Badge>{promoLabel}</Badge>
+        </div>
+      ) : null}
       <div className="mt-4 flex items-center gap-2">
         <Badge>{category}</Badge>
         <Badge>{compatibility}</Badge>
@@ -85,7 +100,7 @@ export function ProductCard({
           trackMarketplaceEvent({
             eventName: "product.card.clicked",
             pageType: tracking.pageType,
-            entityType: "product",
+            entityType: tracking.entityType ?? "product",
             entityId: tracking.entityId,
             metadata: tracking.metadata ?? null,
           });

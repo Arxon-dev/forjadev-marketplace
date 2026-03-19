@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AuthForm } from "./auth-form";
+import { SocialAuthButtons } from "./social-auth-buttons";
 
 export function LoginForm() {
   const router = useRouter();
@@ -62,6 +63,16 @@ export function LoginForm() {
 
   return (
     <AuthForm title="Entrar" subtitle="Accede a tu cuenta de ForjaDev">
+      <SocialAuthButtons />
+
+      <div className="my-6 flex items-center gap-3">
+        <div className="h-px flex-1 bg-white/10" />
+        <span className="text-xs uppercase tracking-[0.18em] text-[var(--text-soft)]">
+          o con email
+        </span>
+        <div className="h-px flex-1 bg-white/10" />
+      </div>
+
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
           {error}

@@ -30,6 +30,7 @@ const pricingOptions = [
 
 const sortOptions = [
   { value: "newest", label: "Mas recientes" },
+  { value: "quality_trust", label: "Calidad y trust" },
   { value: "updated", label: "Recien actualizados" },
   { value: "trending", label: "Tendencia" },
   { value: "best_rated", label: "Mejor valorados" },

@@ -101,6 +101,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    await supabase.rpc("sync_user_provider_identities");
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message =

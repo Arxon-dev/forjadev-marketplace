@@ -3,15 +3,22 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DownloadButton } from "@/components/downloads/download-button";
+import { ProductCollectionButton } from "@/components/community/product-collection-button";
+import { DiscussionThreadForm } from "@/components/community/discussion-thread-form";
+import { WishlistButton } from "@/components/community/wishlist-button";
 import { ProductCard } from "@/components/marketplace/product-card";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { ReviewForm } from "@/components/reviews/review-form";
 import { Badge } from "@/components/ui/badge";
+import { getSimilarProducts, getUsersAlsoBoughtProducts } from "@/lib/intelligence/recommendations";
+import { getPublicDealsForProducts } from "@/lib/promotions/public";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicSellerProfile } from "@/lib/sellers/public";
 
 interface Props {
   params: Promise<{ slug: string }>;
+  searchParams?: Promise<{ coupon?: string }>;
 }
 
 interface RelatedProductRow {
@@ -28,9 +35,49 @@ interface RelatedProductRow {
   rating_count: number;
 }
 
-export default async function ProductDetailPage({ params }: Props) {
+interface DiscussionRow {
+  id: string;
+  author_user_id: string;
+  title: string;
+  body: string;
+  is_pinned: boolean;
+  is_locked: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DiscussionMessageRow {
+  discussion_id: string;
+  author_user_id: string;
+  created_at: string;
+}
+
+interface ProfileLookupRow {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  email: string | null;
+}
+
+interface UserCollectionRow {
+  id: string;
+  title: string;
+  slug: string;
+  description: string | null;
+  is_public: boolean;
+  updated_at: string;
+}
+
+interface CollectionItemLookupRow {
+  collection_id: string;
+  product_id: string;
+}
+
+export default async function ProductDetailPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const resolvedSearchParams = (await searchParams) || {};
   const supabase = await createClient();
+  const adminSupabase = createAdminClient();
 
   const {
     data: { user },
@@ -70,7 +117,18 @@ export default async function ProductDetailPage({ params }: Props) {
         : Promise.resolve({ data: null }),
     ]);
 
-  const sellerProfile = vendor?.slug ? await getPublicSellerProfile(supabase, vendor.slug) : null;
+  const sellerProfile =
+    vendor?.slug ? await getPublicSellerProfile(supabase, adminSupabase, vendor.slug) : null;
+  const activeDeal =
+    (
+      await getPublicDealsForProducts([
+        {
+          id: product.id,
+          price_cents: product.price_cents,
+          is_free: product.is_free,
+        },
+      ])
+    ).get(product.id) || null;
 
   const parentCategory =
     category?.parent_id
@@ -102,6 +160,14 @@ export default async function ProductDetailPage({ params }: Props) {
     .eq("product_id", product.id)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
+
+  const { data: discussions } = await supabase
+    .from("product_discussions")
+    .select("id, author_user_id, title, body, is_pinned, is_locked, created_at, updated_at")
+    .eq("product_id", product.id)
+    .order("is_pinned", { ascending: false })
+    .order("updated_at", { ascending: false })
+    .limit(8);
 
   const versionIds = (versions || []).map((version) => version.id);
   const { data: versionFiles } =
@@ -193,33 +259,90 @@ export default async function ProductDetailPage({ params }: Props) {
     ? (reviews || []).find((review) => review.user_id === user.id) || null
     : null;
 
+  const discussionRows = (discussions || []) as DiscussionRow[];
+  const discussionIds = discussionRows.map((discussion) => discussion.id);
+  const discussionAuthorIds = Array.from(
+    new Set(discussionRows.map((discussion) => discussion.author_user_id))
+  );
+
+  const [{ data: discussionMessages }, { data: discussionProfiles }] = await Promise.all([
+    discussionIds.length > 0
+      ? supabase
+          .from("discussion_messages")
+          .select("discussion_id, author_user_id, created_at")
+          .in("discussion_id", discussionIds)
+      : Promise.resolve({ data: [] as DiscussionMessageRow[] }),
+    discussionAuthorIds.length > 0
+      ? adminSupabase
+          .from("profiles")
+          .select("id, username, display_name, email")
+          .in("id", discussionAuthorIds)
+      : Promise.resolve({ data: [] as ProfileLookupRow[] }),
+  ]);
+
+  const discussionMessagesById = new Map<string, DiscussionMessageRow[]>();
+  ((discussionMessages || []) as DiscussionMessageRow[]).forEach((message) => {
+    const current = discussionMessagesById.get(message.discussion_id) || [];
+    current.push(message);
+    discussionMessagesById.set(message.discussion_id, current);
+  });
+
+  const discussionProfileById = new Map(
+    ((discussionProfiles || []) as ProfileLookupRow[]).map((profile) => [profile.id, profile])
+  );
+
+  const [{ count: wishlistCount }, wishlistEntryResult, userCollectionsResult] = await Promise.all([
+    adminSupabase
+      .from("wishlists")
+      .select("*", { count: "exact", head: true })
+      .eq("product_id", product.id),
+    user
+      ? supabase
+          .from("wishlists")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("product_id", product.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    user
+      ? supabase
+          .from("collections")
+          .select("id, title, slug, description, is_public, updated_at")
+          .eq("user_id", user.id)
+          .order("updated_at", { ascending: false })
+          .limit(8)
+      : Promise.resolve({ data: [] as UserCollectionRow[] }),
+  ]);
+
+  const isWishlisted = Boolean(wishlistEntryResult.data);
+  const userCollections = (userCollectionsResult.data || []) as UserCollectionRow[];
+  const userCollectionIds = userCollections.map((collection) => collection.id);
+
+  const { data: userCollectionItemsData } =
+    userCollectionIds.length > 0
+      ? await supabase
+          .from("collection_items")
+          .select("collection_id, product_id")
+          .in("collection_id", userCollectionIds)
+      : { data: [] as CollectionItemLookupRow[] };
+
+  const userCollectionItemCounts = new Map<string, number>();
+  const includedCollectionIds = new Set<string>();
+  ((userCollectionItemsData || []) as CollectionItemLookupRow[]).forEach((item) => {
+    userCollectionItemCounts.set(
+      item.collection_id,
+      (userCollectionItemCounts.get(item.collection_id) || 0) + 1
+    );
+
+    if (item.product_id === product.id) {
+      includedCollectionIds.add(item.collection_id);
+    }
+  });
+
   const averageRating =
     reviews && reviews.length > 0
       ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
       : null;
-
-  const relatedProductsPromise =
-    product.category_id || product.game_id
-      ? supabase
-          .from("products")
-          .select(
-            "id, vendor_id, category_id, title, slug, price_cents, is_free, compatibility, featured_image_url, rating_average, rating_count"
-          )
-          .eq("moderation_status", "approved")
-          .neq("id", product.id)
-          .or(
-            [
-              product.category_id ? `category_id.eq.${product.category_id}` : null,
-              product.game_id ? `game_id.eq.${product.game_id}` : null,
-            ]
-              .filter(Boolean)
-              .join(",")
-          )
-          .order("featured", { ascending: false })
-          .order("purchase_count", { ascending: false })
-          .order("updated_at", { ascending: false })
-          .limit(6)
-      : Promise.resolve({ data: [] as RelatedProductRow[] });
 
   const sellerProductsPromise = supabase
     .from("products")
@@ -232,14 +355,46 @@ export default async function ProductDetailPage({ params }: Props) {
     .order("updated_at", { ascending: false })
     .limit(3);
 
-  const [relatedProductsResult, sellerProductsResult] = await Promise.all([
-    relatedProductsPromise,
+  const [similarProductsResult, alsoBoughtProductsResult, sellerProductsResult] = await Promise.all([
+    getSimilarProducts(
+      {
+        id: product.id,
+        categoryId: product.category_id,
+        gameId: product.game_id,
+      },
+      3
+    ),
+    getUsersAlsoBoughtProducts(product.id, 3),
     sellerProductsPromise,
   ]);
 
-  const relatedProducts = (relatedProductsResult.data || []) as RelatedProductRow[];
-  const sellerProducts = (sellerProductsResult.data || []) as RelatedProductRow[];
-  const loopProducts = [...relatedProducts, ...sellerProducts];
+  const seenLoopProductIds = new Set<string>();
+  const similarProducts = (similarProductsResult || []).filter((item) => {
+    if (seenLoopProductIds.has(item.id)) {
+      return false;
+    }
+
+    seenLoopProductIds.add(item.id);
+    return true;
+  }) as RelatedProductRow[];
+  const alsoBoughtProducts = (alsoBoughtProductsResult || []).filter((item) => {
+    if (seenLoopProductIds.has(item.id)) {
+      return false;
+    }
+
+    seenLoopProductIds.add(item.id);
+    return true;
+  }) as RelatedProductRow[];
+  const sellerProducts = ((sellerProductsResult.data || []) as RelatedProductRow[]).filter((item) => {
+    if (seenLoopProductIds.has(item.id)) {
+      return false;
+    }
+
+    seenLoopProductIds.add(item.id);
+    return true;
+  });
+  const loopProducts = [...similarProducts, ...alsoBoughtProducts, ...sellerProducts];
+  const loopDealsByProductId = await getPublicDealsForProducts(loopProducts);
   const vendorIds = Array.from(new Set(loopProducts.map((item) => item.vendor_id)));
   const categoryIds = Array.from(
     new Set(loopProducts.map((item) => item.category_id).filter(Boolean))
@@ -260,6 +415,11 @@ export default async function ProductDetailPage({ params }: Props) {
   const categoryById = new Map(
     (categoriesResult.data || []).map((item) => [item.id, item.name])
   );
+  const appliedCouponCode =
+    activeDeal?.source === "coupon" && activeDeal.code ? activeDeal.code : resolvedSearchParams.coupon;
+  const checkoutHref = `/checkout/${product.id}${
+    appliedCouponCode ? `?coupon=${encodeURIComponent(appliedCouponCode)}` : ""
+  }`;
 
   return (
     <main>
@@ -315,7 +475,7 @@ export default async function ProductDetailPage({ params }: Props) {
             </p>
             <h1 className="mt-3 text-4xl font-bold text-white">{product.title}</h1>
             <p className="mt-3 text-sm text-[var(--text-soft)]">
-              Por {vendor?.store_name || "Tienda"} · Estado: {product.moderation_status}
+              Por {vendor?.store_name || "Tienda"} | Estado: {product.moderation_status}
             </p>
 
             {product.featured_image_url ? (
@@ -467,10 +627,53 @@ export default async function ProductDetailPage({ params }: Props) {
             <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
               <p className="text-sm text-[var(--text-soft)]">Precio</p>
               <p className="mt-2 text-3xl font-bold text-white">
-                {product.is_free ? "Gratis" : `EUR ${(product.price_cents / 100).toFixed(2)}`}
+                {product.is_free
+                  ? "Gratis"
+                  : `EUR ${((activeDeal?.discountedPriceCents ?? product.price_cents) / 100).toFixed(2)}`}
               </p>
+              {activeDeal ? (
+                <div className="mt-3 space-y-2">
+                  <p className="text-sm text-[var(--text-soft)] line-through">
+                    EUR {(product.price_cents / 100).toFixed(2)}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge>
+                      {activeDeal.discountType === "percent"
+                        ? `${activeDeal.discountValue}% OFF`
+                        : `Ahorra EUR ${(activeDeal.savingsCents / 100).toFixed(2)}`}
+                    </Badge>
+                    <Badge>{activeDeal.promoLabel}</Badge>
+                  </div>
+                  <p className="text-sm text-emerald-300">
+                    Ahorro inmediato de EUR {(activeDeal.savingsCents / 100).toFixed(2)}
+                    {activeDeal.expiresAt
+                      ? ` | Activo hasta ${new Date(activeDeal.expiresAt).toLocaleString("es-ES")}`
+                      : ""}
+                  </p>
+                </div>
+              ) : null}
 
               <div className="mt-6 space-y-4">
+                <WishlistButton
+                  productId={product.id}
+                  initialWishlisted={isWishlisted}
+                  initialCount={wishlistCount || 0}
+                  pageType="product_detail"
+                />
+                {user ? (
+                  <ProductCollectionButton
+                    productId={product.id}
+                    initialCollections={userCollections.map((collection) => ({
+                      id: collection.id,
+                      title: collection.title,
+                      slug: collection.slug,
+                      description: collection.description,
+                      isPublic: collection.is_public,
+                      itemCount: userCollectionItemCounts.get(collection.id) || 0,
+                      isIncluded: includedCollectionIds.has(collection.id),
+                    }))}
+                  />
+                ) : null}
                 {!user ? (
                   <>
                     <p className="text-sm text-[var(--text-soft)]">
@@ -508,11 +711,23 @@ export default async function ProductDetailPage({ params }: Props) {
                       Este producto requiere una compra completada antes de poder descargarlo.
                     </p>
                     <Link
-                      href={`/checkout/${product.id}`}
+                      href={checkoutHref}
                       className="inline-flex rounded-2xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-95"
                     >
                       Ir al checkout
                     </Link>
+                    {activeDeal ? (
+                      <p className="text-sm text-[var(--text-soft)]">
+                        {activeDeal.source === "coupon" && activeDeal.code
+                          ? (
+                              <>
+                                El checkout puede aplicar automaticamente el codigo{" "}
+                                <span className="font-semibold text-white">{activeDeal.code}</span>.
+                              </>
+                            )
+                          : "El checkout aplicara automaticamente la promocion activa."}
+                      </p>
+                    ) : null}
                   </>
                 )}
               </div>
@@ -556,6 +771,14 @@ export default async function ProductDetailPage({ params }: Props) {
                     {averageRating ? `${averageRating.toFixed(1)}/5` : "Sin valoraciones"}
                   </span>
                 </p>
+                {activeDeal ? (
+                  <p>
+                    Deal activo:{" "}
+                    <span className="text-white">
+                      {activeDeal.promoLabel}
+                    </span>
+                  </p>
+                ) : null}
               </div>
             </div>
 
@@ -581,6 +804,18 @@ export default async function ProductDetailPage({ params }: Props) {
                     <Badge key={badge.label}>{badge.label}</Badge>
                   ))}
                 </div>
+
+                {sellerProfile.identityVerification.isVerified ? (
+                  <p className="mt-4 text-sm text-[var(--text-soft)]">
+                    Identidad verificada en{" "}
+                    <span className="text-white">
+                      {sellerProfile.identityVerification.providers
+                        .map((provider) => provider.charAt(0).toUpperCase() + provider.slice(1))
+                        .join(" y ")}
+                    </span>
+                    .
+                  </p>
+                ) : null}
 
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
                   <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
@@ -704,38 +939,192 @@ export default async function ProductDetailPage({ params }: Props) {
           </div>
         </div>
 
-        {relatedProducts.length > 0 ? (
+        <section className="mt-12">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-white">Discusiones del producto</h2>
+            <p className="mt-2 text-sm text-[var(--text-soft)]">
+              Conversaciones publicas para dudas, contexto de uso y feedback util para la comunidad.
+            </p>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+            <div>
+              {user ? (
+                <DiscussionThreadForm productId={product.id} />
+              ) : (
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+                  <p className="text-[var(--text-soft)]">
+                    Inicia sesion para abrir una discusion sobre este producto.
+                  </p>
+                  <Link
+                    href="/login"
+                    className="mt-4 inline-flex rounded-2xl bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-95"
+                  >
+                    Iniciar sesion
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+              <h3 className="text-xl font-semibold text-white">Hilos recientes</h3>
+              {discussionRows.length > 0 ? (
+                <div className="mt-5 space-y-4">
+                  {discussionRows.map((discussion) => {
+                    const author = discussionProfileById.get(discussion.author_user_id);
+                    const replyCount = discussionMessagesById.get(discussion.id)?.length || 0;
+
+                    return (
+                      <article key={discussion.id} className="rounded-2xl border border-white/10 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="flex flex-wrap gap-2">
+                              {discussion.is_pinned ? <Badge>Fijada</Badge> : null}
+                              {discussion.is_locked ? <Badge>Bloqueada</Badge> : null}
+                            </div>
+                            <h4 className="mt-3 text-lg font-semibold text-white">
+                              {discussion.title}
+                            </h4>
+                            <p className="mt-2 line-clamp-3 text-sm text-[var(--text-soft)]">
+                              {discussion.body}
+                            </p>
+                          </div>
+                          <Link
+                            href={`/products/${product.slug}/discussions/${discussion.id}`}
+                            className="text-sm font-semibold text-white hover:underline"
+                          >
+                            Abrir
+                          </Link>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-4 text-xs text-[var(--text-soft)]">
+                          <span>
+                            Por{" "}
+                            {author?.display_name ||
+                              author?.username ||
+                              author?.email ||
+                              "Usuario"}
+                          </span>
+                          <span>{replyCount} respuestas</span>
+                          <span>
+                            Actualizada {new Date(discussion.updated_at).toLocaleString("es-ES")}
+                          </span>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-5 rounded-2xl border border-white/10 bg-black/10 px-6 py-12 text-center">
+                  <p className="text-[var(--text-soft)]">
+                    Todavia no hay discusiones. La primera conversacion util puede empezar aqui.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {alsoBoughtProducts.length > 0 ? (
           <section className="mt-12">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-white">Productos relacionados</h2>
+              <h2 className="text-2xl font-bold text-white">Los usuarios tambien compraron</h2>
               <p className="mt-2 text-sm text-[var(--text-soft)]">
-                Mas opciones conectadas por categoria o juego para seguir descubriendo.
+                Recomendaciones basadas en patrones reales de compra alrededor de este producto.
               </p>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {relatedProducts.map((item) => (
-                <ProductCard
-                  key={item.id}
-                  title={item.title}
-                  author={vendorById.get(item.vendor_id) || "ForjaDev"}
-                  category={categoryById.get(item.category_id || "") || "Marketplace"}
-                  price={item.is_free ? "Gratis" : `EUR ${(item.price_cents / 100).toFixed(2)}`}
-                  compatibility={item.compatibility || game?.name || "Rust"}
-                  ratingAverage={item.rating_average}
-                  ratingCount={item.rating_count}
-                  href={`/products/${item.slug}`}
-                  imageUrl={item.featured_image_url}
-                  tracking={{
-                    pageType: "product_detail",
-                    entityId: item.id,
-                    metadata: {
-                      source: "related_products",
-                      productId: product.id,
-                    },
-                  }}
-                />
-              ))}
+              {alsoBoughtProducts.map((item) => {
+                const deal = loopDealsByProductId.get(item.id);
+
+                return (
+                  <ProductCard
+                    key={item.id}
+                    title={item.title}
+                    author={vendorById.get(item.vendor_id) || "ForjaDev"}
+                    category={categoryById.get(item.category_id || "") || "Marketplace"}
+                    price={
+                      item.is_free
+                        ? "Gratis"
+                        : `EUR ${((deal?.discountedPriceCents ?? item.price_cents) / 100).toFixed(2)}`
+                    }
+                    originalPrice={
+                      deal && deal.discountedPriceCents < item.price_cents
+                        ? `EUR ${(item.price_cents / 100).toFixed(2)}`
+                        : null
+                    }
+                    promoLabel={deal?.promoLabel || null}
+                    compatibility={item.compatibility || game?.name || "Rust"}
+                    ratingAverage={item.rating_average}
+                    ratingCount={item.rating_count}
+                    href={`/products/${item.slug}`}
+                    imageUrl={item.featured_image_url}
+                    tracking={{
+                      pageType: "product_detail",
+                      entityId: item.id,
+                      metadata: {
+                        source: "users_also_bought",
+                        productId: product.id,
+                        hasDeal: Boolean(deal),
+                      },
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
+        {similarProducts.length > 0 ? (
+          <section className="mt-12">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white">Productos similares</h2>
+              <p className="mt-2 text-sm text-[var(--text-soft)]">
+                Ranking por cercania de categoria, juego y senales de calidad/trust.
+              </p>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {similarProducts.map((item) => {
+                const deal = loopDealsByProductId.get(item.id);
+
+                return (
+                  <ProductCard
+                    key={item.id}
+                    title={item.title}
+                    author={vendorById.get(item.vendor_id) || "ForjaDev"}
+                    category={categoryById.get(item.category_id || "") || "Marketplace"}
+                    price={
+                      item.is_free
+                        ? "Gratis"
+                        : `EUR ${((deal?.discountedPriceCents ?? item.price_cents) / 100).toFixed(2)}`
+                    }
+                    originalPrice={
+                      deal && deal.discountedPriceCents < item.price_cents
+                        ? `EUR ${(item.price_cents / 100).toFixed(2)}`
+                        : null
+                    }
+                    promoLabel={
+                      deal?.promoLabel || null
+                    }
+                    compatibility={item.compatibility || game?.name || "Rust"}
+                    ratingAverage={item.rating_average}
+                    ratingCount={item.rating_count}
+                    href={`/products/${item.slug}`}
+                    imageUrl={item.featured_image_url}
+                    tracking={{
+                      pageType: "product_detail",
+                      entityId: item.id,
+                      metadata: {
+                        source: "similar_products",
+                        productId: product.id,
+                        hasDeal: Boolean(deal),
+                      },
+                    }}
+                  />
+                );
+              })}
             </div>
           </section>
         ) : null}
@@ -750,28 +1139,45 @@ export default async function ProductDetailPage({ params }: Props) {
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {sellerProducts.map((item) => (
-                <ProductCard
-                  key={item.id}
-                  title={item.title}
-                  author={vendorById.get(item.vendor_id) || "ForjaDev"}
-                  category={categoryById.get(item.category_id || "") || "Marketplace"}
-                  price={item.is_free ? "Gratis" : `EUR ${(item.price_cents / 100).toFixed(2)}`}
-                  compatibility={item.compatibility || game?.name || "Rust"}
-                  ratingAverage={item.rating_average}
-                  ratingCount={item.rating_count}
-                  href={`/products/${item.slug}`}
-                  imageUrl={item.featured_image_url}
-                  tracking={{
-                    pageType: "product_detail",
-                    entityId: item.id,
-                    metadata: {
-                      source: "seller_products",
-                      productId: product.id,
-                    },
-                  }}
-                />
-              ))}
+              {sellerProducts.map((item) => {
+                const deal = loopDealsByProductId.get(item.id);
+
+                return (
+                  <ProductCard
+                    key={item.id}
+                    title={item.title}
+                    author={vendorById.get(item.vendor_id) || "ForjaDev"}
+                    category={categoryById.get(item.category_id || "") || "Marketplace"}
+                    price={
+                      item.is_free
+                        ? "Gratis"
+                        : `EUR ${((deal?.discountedPriceCents ?? item.price_cents) / 100).toFixed(2)}`
+                    }
+                    originalPrice={
+                      deal && deal.discountedPriceCents < item.price_cents
+                        ? `EUR ${(item.price_cents / 100).toFixed(2)}`
+                        : null
+                    }
+                    promoLabel={
+                      deal?.promoLabel || null
+                    }
+                    compatibility={item.compatibility || game?.name || "Rust"}
+                    ratingAverage={item.rating_average}
+                    ratingCount={item.rating_count}
+                    href={`/products/${item.slug}`}
+                    imageUrl={item.featured_image_url}
+                    tracking={{
+                      pageType: "product_detail",
+                      entityId: item.id,
+                      metadata: {
+                        source: "seller_products",
+                        productId: product.id,
+                        hasDeal: Boolean(deal),
+                      },
+                    }}
+                  />
+                );
+              })}
             </div>
           </section>
         ) : null}

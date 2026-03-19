@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarketplaceTracker } from "@/components/analytics/marketplace-tracker";
+import { SellerFollowButton } from "@/components/community/seller-follow-button";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { ProductCard } from "@/components/marketplace/product-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/cn";
 import { getPublicSellerProfile } from "@/lib/sellers/public";
@@ -30,7 +32,11 @@ function badgeToneClass(tone: "primary" | "success" | "warning") {
 export default async function SellerProfilePage({ params }: SellerProfilePageProps) {
   const { slug } = await params;
   const supabase = await createClient();
-  const seller = await getPublicSellerProfile(supabase, slug);
+  const adminSupabase = createAdminClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const seller = await getPublicSellerProfile(supabase, adminSupabase, slug);
 
   if (!seller) {
     notFound();
@@ -91,6 +97,24 @@ export default async function SellerProfilePage({ params }: SellerProfilePagePro
     }))
     .filter((item): item is { id: string; name: string; slug: string; count: number } => Boolean(item));
 
+  const [{ count: followerCount }, followEntryResult] = await Promise.all([
+    adminSupabase
+      .from("seller_followers")
+      .select("*", { count: "exact", head: true })
+      .eq("vendor_id", seller.vendor.id),
+    user
+      ? supabase
+          .from("seller_followers")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("vendor_id", seller.vendor.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const isFollowing = Boolean(followEntryResult.data);
+  const isOwnSeller = Boolean(user && seller.vendor.user_id === user.id);
+
   return (
     <main>
       <SiteHeaderServer />
@@ -124,6 +148,54 @@ export default async function SellerProfilePage({ params }: SellerProfilePagePro
                 "Este creador publica recursos para servidores en ForjaDev y mantiene un catalogo activo para la comunidad."}
             </p>
 
+            {seller.vendor.discord_url ||
+            seller.vendor.steam_url ||
+            seller.vendor.x_url ||
+            seller.vendor.website_url ? (
+              <div className="mt-5 flex flex-wrap gap-3">
+                {seller.vendor.discord_url ? (
+                  <a
+                    href={seller.vendor.discord_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/10"
+                  >
+                    Discord
+                  </a>
+                ) : null}
+                {seller.vendor.steam_url ? (
+                  <a
+                    href={seller.vendor.steam_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/10"
+                  >
+                    Steam
+                  </a>
+                ) : null}
+                {seller.vendor.x_url ? (
+                  <a
+                    href={seller.vendor.x_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/10"
+                  >
+                    X
+                  </a>
+                ) : null}
+                {seller.vendor.website_url ? (
+                  <a
+                    href={seller.vendor.website_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/10"
+                  >
+                    Web
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="mt-6 flex flex-wrap gap-3">
               {seller.badges.map((badge) => (
                 <Badge key={badge.label} className={cn("text-sm", badgeToneClass(badge.tone))}>
@@ -131,6 +203,29 @@ export default async function SellerProfilePage({ params }: SellerProfilePagePro
                 </Badge>
               ))}
             </div>
+
+            {seller.identityVerification.isVerified ? (
+              <p className="mt-4 text-sm text-[var(--text-soft)]">
+                Identidad comunitaria verificada en{" "}
+                <span className="font-semibold text-white">
+                  {seller.identityVerification.providers
+                    .map((provider) => provider.charAt(0).toUpperCase() + provider.slice(1))
+                    .join(" y ")}
+                </span>
+                .
+              </p>
+            ) : null}
+
+            {!isOwnSeller ? (
+              <div className="mt-6">
+                <SellerFollowButton
+                  vendorId={seller.vendor.id}
+                  initialFollowing={isFollowing}
+                  initialFollowerCount={followerCount || 0}
+                  pageType="seller_profile"
+                />
+              </div>
+            ) : null}
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
@@ -196,6 +291,21 @@ export default async function SellerProfilePage({ params }: SellerProfilePagePro
                 Portfolio:{" "}
                 <span className="text-white">
                   {seller.metrics.paidProducts} de pago / {seller.metrics.freeProducts} gratis
+                </span>
+              </p>
+              <p>
+                Seguidores: <span className="text-white">{followerCount || 0}</span>
+              </p>
+              <p>
+                Verificacion:{" "}
+                <span className="text-white">
+                  {seller.identityVerification.isVerified
+                    ? seller.identityVerification.providers
+                        .map((provider) =>
+                          provider.charAt(0).toUpperCase() + provider.slice(1)
+                        )
+                        .join(" / ")
+                    : "Sin verificar"}
                 </span>
               </p>
             </div>

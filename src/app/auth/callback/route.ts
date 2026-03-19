@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
 
       if (user) {
         await supabase.rpc("ensure_profile_exists");
+        await supabase.rpc("sync_user_provider_identities");
       }
 
       // Redirige al usuario

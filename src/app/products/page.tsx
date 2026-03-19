@@ -2,6 +2,9 @@ import { MarketplaceTracker } from "@/components/analytics/marketplace-tracker";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { ProductCard } from "@/components/marketplace/product-card";
 import { ProductFilters } from "@/components/marketplace/product-filters";
+import { computeQualityTrustScore } from "@/lib/intelligence/catalog";
+import { getPublicDealsForProducts } from "@/lib/promotions/public";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 interface ProductsPageProps {
@@ -23,6 +26,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const category = params.category || "all";
 
   const supabase = await createClient();
+  const adminSupabase = createAdminClient();
 
   const [{ data: games }, { data: categories }] = await Promise.all([
     supabase
@@ -129,7 +133,81 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     productsQuery = productsQuery.order("created_at", { ascending: false });
   }
 
-  const { data: products } = await productsQuery;
+  const { data: productsData } = await productsQuery;
+  let products = productsData || [];
+
+  if (sort === "quality_trust" && products.length > 0) {
+    const vendorIdsForRanking = Array.from(new Set(products.map((product) => product.vendor_id)));
+    const productIdsForRanking = products.map((product) => product.id);
+
+    const [sellerReputationResult, sellerRiskResult, productRiskResult] = await Promise.all([
+      adminSupabase
+        .from("seller_reputation_snapshots")
+        .select("vendor_id, reputation_score")
+        .in("vendor_id", vendorIdsForRanking),
+      adminSupabase
+        .from("seller_risk_snapshots")
+        .select("vendor_id, risk_score")
+        .in("vendor_id", vendorIdsForRanking),
+      adminSupabase
+        .from("product_risk_snapshots")
+        .select("product_id, risk_score")
+        .in("product_id", productIdsForRanking),
+    ]);
+
+    const sellerReputationRows = (sellerReputationResult.data || []) as Array<{
+      vendor_id: string;
+      reputation_score: number;
+    }>;
+    const sellerRiskRows = (sellerRiskResult.data || []) as Array<{
+      vendor_id: string;
+      risk_score: number;
+    }>;
+    const productRiskRows = (productRiskResult.data || []) as Array<{
+      product_id: string;
+      risk_score: number;
+    }>;
+
+    const sellerReputationByVendorId = new Map(
+      sellerReputationRows.map((item) => [item.vendor_id, item.reputation_score])
+    );
+    const sellerRiskByVendorId = new Map(
+      sellerRiskRows.map((item) => [item.vendor_id, item.risk_score])
+    );
+    const productRiskByProductId = new Map(
+      productRiskRows.map((item) => [item.product_id, item.risk_score])
+    );
+
+    products = [...products].sort((a, b) => {
+      const scoreA = computeQualityTrustScore(
+        a,
+        {
+          reputationScore: sellerReputationByVendorId.get(a.vendor_id) || 0,
+          riskScore: sellerRiskByVendorId.get(a.vendor_id) || 0,
+        },
+        {
+          riskScore: productRiskByProductId.get(a.id) || 0,
+        }
+      );
+      const scoreB = computeQualityTrustScore(
+        b,
+        {
+          reputationScore: sellerReputationByVendorId.get(b.vendor_id) || 0,
+          riskScore: sellerRiskByVendorId.get(b.vendor_id) || 0,
+        },
+        {
+          riskScore: productRiskByProductId.get(b.id) || 0,
+        }
+      );
+
+      return (
+        scoreB - scoreA ||
+        b.purchase_count - a.purchase_count ||
+        b.rating_average - a.rating_average ||
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      );
+    });
+  }
 
   const vendorIds = Array.from(new Set((products || []).map((product) => product.vendor_id)));
   const categoryIds = Array.from(
@@ -151,6 +229,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const categoryById = new Map(
     (productCategoriesResult.data || []).map((item) => [item.id, item.name])
   );
+  const dealsByProductId = await getPublicDealsForProducts(products || []);
 
   return (
     <main>
@@ -172,6 +251,11 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         <p className="mt-3 text-[var(--text-soft)]">
           Explora los productos aprobados que ya estan disponibles en el marketplace.
         </p>
+        {sort === "quality_trust" ? (
+          <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            Orden inteligente activo: mezcla calidad del producto, reputacion del seller y penalizacion por riesgo operativo.
+          </div>
+        ) : null}
 
         <ProductFilters
           initialSearch={query}
@@ -192,29 +276,44 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
         {products && products.length > 0 ? (
           <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {products.map((product) => (
-              <ProductCard
-                key={product.id}
-                title={product.title}
-                author={vendorById.get(product.vendor_id) || "ForjaDev"}
-                category={categoryById.get(product.category_id || "") || "Marketplace"}
-                price={product.is_free ? "Gratis" : `EUR ${(product.price_cents / 100).toFixed(2)}`}
-                compatibility={product.compatibility || "Rust"}
-                ratingAverage={product.rating_average}
-                ratingCount={product.rating_count}
-                href={`/products/${product.slug}`}
-                imageUrl={product.featured_image_url}
-                tracking={{
-                  pageType: "catalog",
-                  entityId: product.id,
-                  metadata: {
-                    source: "catalog",
-                    category: categoryById.get(product.category_id || "") || "Marketplace",
-                    game,
-                  },
-                }}
-              />
-            ))}
+            {products.map((product) => {
+              const deal = dealsByProductId.get(product.id);
+
+              return (
+                <ProductCard
+                  key={product.id}
+                  title={product.title}
+                  author={vendorById.get(product.vendor_id) || "ForjaDev"}
+                  category={categoryById.get(product.category_id || "") || "Marketplace"}
+                  price={
+                    product.is_free
+                      ? "Gratis"
+                      : `EUR ${((deal?.discountedPriceCents ?? product.price_cents) / 100).toFixed(2)}`
+                  }
+                    originalPrice={
+                      deal && deal.discountedPriceCents < product.price_cents
+                        ? `EUR ${(product.price_cents / 100).toFixed(2)}`
+                        : null
+                    }
+                    promoLabel={deal?.promoLabel || null}
+                  compatibility={product.compatibility || "Rust"}
+                  ratingAverage={product.rating_average}
+                  ratingCount={product.rating_count}
+                  href={`/products/${product.slug}`}
+                  imageUrl={product.featured_image_url}
+                  tracking={{
+                    pageType: "catalog",
+                    entityId: product.id,
+                    metadata: {
+                      source: "catalog",
+                      category: categoryById.get(product.category_id || "") || "Marketplace",
+                      game,
+                      hasDeal: Boolean(deal),
+                    },
+                  }}
+                />
+              );
+            })}
           </div>
         ) : (
           <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 px-6 py-12 text-center">

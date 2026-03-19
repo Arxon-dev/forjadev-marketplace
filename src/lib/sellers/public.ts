@@ -14,6 +14,8 @@ export type SellerBadge = {
   tone: "primary" | "success" | "warning";
 };
 
+export type SellerIdentityProvider = "discord" | "steam";
+
 export type PublicSellerProfile = {
   vendor: VendorRow;
   products: ProductRow[];
@@ -29,6 +31,10 @@ export type PublicSellerProfile = {
     latestProductUpdateAt: string | null;
     reputationScore: number;
   };
+  identityVerification: {
+    isVerified: boolean;
+    providers: SellerIdentityProvider[];
+  };
   badges: SellerBadge[];
 };
 
@@ -40,13 +46,23 @@ function roundRating(value: number | null) {
   return Math.round(value * 10) / 10;
 }
 
-export function deriveSellerBadges(metrics: PublicSellerProfile["metrics"]): SellerBadge[] {
+export function deriveSellerBadges(
+  metrics: PublicSellerProfile["metrics"],
+  providers: SellerIdentityProvider[] = []
+): SellerBadge[] {
   const badges: SellerBadge[] = [
     {
       label: "Tienda activa",
       tone: "primary",
     },
   ];
+
+  if (providers.length > 0) {
+    badges.push({
+      label: "Identidad verificada",
+      tone: "primary",
+    });
+  }
 
   if (metrics.totalPurchases >= 25) {
     badges.push({
@@ -77,11 +93,12 @@ export function deriveSellerBadges(metrics: PublicSellerProfile["metrics"]): Sel
 
 export async function getPublicSellerProfile(
   supabase: SupabaseClientLike,
+  adminSupabase: SupabaseClientLike,
   slug: string
 ): Promise<PublicSellerProfile | null> {
   const { data: vendor } = await supabase
     .from("vendors")
-    .select("id, user_id, store_name, slug, bio, created_at")
+    .select("id, user_id, store_name, slug, bio, discord_url, steam_url, x_url, website_url, created_at")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -101,7 +118,7 @@ export async function getPublicSellerProfile(
     .order("updated_at", { ascending: false });
 
   const approvedProducts = (products || []) as ProductRow[];
-  const [snapshotResult, badgesResult] = await Promise.all([
+  const [snapshotResult, badgesResult, identityResult] = await Promise.all([
     supabase
       .from("seller_reputation_snapshots")
       .select(
@@ -115,6 +132,10 @@ export async function getPublicSellerProfile(
       .eq("vendor_id", vendor.id)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
+    adminSupabase
+      .from("user_provider_identities")
+      .select("provider")
+      .eq("user_id", vendor.user_id),
   ]);
   const totalRatings = approvedProducts.reduce((sum, product) => sum + product.rating_count, 0);
   const totalWeightedRating = approvedProducts.reduce(
@@ -166,11 +187,32 @@ export async function getPublicSellerProfile(
     label: badge.label,
     tone: badge.tone,
   }));
+  const identityProviders = Array.from(
+    new Set(
+      (((identityResult.data || []) as Array<{ provider: SellerIdentityProvider }>).map(
+        (identity) => identity.provider
+      ) || []) as SellerIdentityProvider[]
+    )
+  );
+  const derivedBadges = deriveSellerBadges(metrics, identityProviders);
+  const finalBadges =
+    persistedBadges.length > 0
+      ? [
+          ...persistedBadges,
+          ...derivedBadges.filter(
+            (badge) => !persistedBadges.some((persisted) => persisted.label === badge.label)
+          ),
+        ]
+      : derivedBadges;
 
   return {
     vendor: vendor as VendorRow,
     products: approvedProducts,
     metrics,
-    badges: persistedBadges.length > 0 ? persistedBadges : deriveSellerBadges(metrics),
+    identityVerification: {
+      isVerified: identityProviders.length > 0,
+      providers: identityProviders,
+    },
+    badges: finalBadges,
   };
 }

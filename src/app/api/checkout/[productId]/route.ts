@@ -7,7 +7,7 @@ interface RouteContext {
   }>;
 }
 
-export async function POST(_request: Request, { params }: RouteContext) {
+export async function POST(request: Request, { params }: RouteContext) {
   try {
     const { productId } = await params;
     const supabase = await createClient();
@@ -22,8 +22,14 @@ export async function POST(_request: Request, { params }: RouteContext) {
 
     await supabase.rpc("ensure_profile_exists");
 
+    const requestPayload = (await request.json().catch(() => null)) as
+      | { couponCode?: string }
+      | null;
+    const couponCode = requestPayload?.couponCode?.trim() || null;
+
     const { data, error } = await supabase.rpc("create_checkout_order", {
       p_product_id: productId,
+      p_coupon_code: couponCode,
     });
 
     if (error) {
@@ -35,6 +41,9 @@ export async function POST(_request: Request, { params }: RouteContext) {
             ? 409
             : message === "No puedes comprar tu propio producto"
               ? 400
+              : message === "Cupon no valido" ||
+                  message === "No puedes aplicar cupones a productos gratuitos"
+                ? 400
               : message === "Necesitas iniciar sesion"
                 ? 401
                 : message === "Solo puedes comprar productos aprobados" ||
@@ -45,9 +54,9 @@ export async function POST(_request: Request, { params }: RouteContext) {
       return NextResponse.json({ message }, { status });
     }
 
-    const payload = Array.isArray(data) ? data[0] : data;
+    const resultPayload = Array.isArray(data) ? data[0] : data;
 
-    if (!payload) {
+    if (!resultPayload) {
       return NextResponse.json(
         { message: "La compra no devolvio un resultado valido" },
         { status: 500 }
@@ -55,10 +64,13 @@ export async function POST(_request: Request, { params }: RouteContext) {
     }
 
     return NextResponse.json({
-      message: payload.message,
-      orderId: payload.order_id,
-      licenseIssued: payload.license_issued,
-      licenseKey: payload.license_key,
+      message: resultPayload.message,
+      orderId: resultPayload.order_id,
+      licenseIssued: resultPayload.license_issued,
+      licenseKey: resultPayload.license_key,
+      couponCode: resultPayload.coupon_code,
+      discountCents: resultPayload.discount_cents,
+      totalCents: resultPayload.total_cents,
     });
   } catch {
     return NextResponse.json(

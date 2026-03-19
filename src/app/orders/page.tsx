@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { DisputeForm } from "@/components/community/dispute-form";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -83,6 +84,12 @@ export default async function OrdersPage() {
                                 Abrir soporte
                               </Link>
                             ) : null}
+                            <Link
+                              href="/disputes"
+                              className="text-sm font-medium text-white hover:underline"
+                            >
+                              Ver disputas
+                            </Link>
                           </div>
                         </div>
 
@@ -102,6 +109,16 @@ export default async function OrdersPage() {
                             Esta compra no tiene licencia asociada.
                           </p>
                         )}
+                        {item.product?.id ? (
+                          <div className="mt-4">
+                            <DisputeForm
+                              orderId={order.id}
+                              productId={item.product.id}
+                              licenseId={license?.id || null}
+                              productTitle={item.product.title || "Producto"}
+                            />
+                          </div>
+                        ) : null}
                       </div>
                     );
                   })}

@@ -1,15 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { AuthForm } from "./auth-form";
+import { SocialAuthButtons } from "./social-auth-buttons";
 
 export function RegisterForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -29,12 +29,12 @@ export function RegisterForm() {
     }
 
     if (password !== confirmPassword) {
-      setError("Las contraseñas no coinciden");
+      setError("Las contrasenas no coinciden");
       return;
     }
 
     if (password.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres");
+      setError("La contrasena debe tener al menos 6 caracteres");
       return;
     }
 
@@ -43,7 +43,6 @@ export function RegisterForm() {
     try {
       const supabase = createClient();
 
-      // Registro con metadatos
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -55,34 +54,30 @@ export function RegisterForm() {
         },
       });
 
-      if (signUpError) throw signUpError;
+      if (signUpError) {
+        throw signUpError;
+      }
 
-      // Verifica si se requiere confirmación de email
-      // Si hay sesión inmediatamente, no se requiere confirmación
       const emailConfirmationRequired = data.session === null;
 
       if (emailConfirmationRequired) {
-        // Email confirmation ON
-        setMessage(
-          "¡Cuenta creada! Revisa tu correo electrónico para confirmar tu email."
-        );
-        // Redirige a una página de confirmación después de 2s
+        setMessage("Cuenta creada. Revisa tu correo para confirmar tu email.");
         setTimeout(() => {
           router.push("/login?email_confirmed=false");
         }, 2000);
       } else if (data.session) {
         const { error: profileError } = await supabase.rpc("ensure_profile_exists");
-        if (profileError) throw profileError;
-        // Email confirmation OFF e inmediatamente logueado
-        setMessage("¡Cuenta creada exitosamente!");
+
+        if (profileError) {
+          throw profileError;
+        }
+
+        setMessage("Cuenta creada exitosamente.");
         setTimeout(() => {
           router.push("/dashboard");
         }, 500);
       } else {
-        // Estado intermedio
-        setMessage(
-          "¡Cuenta creada! Por favor inicia sesión con tus credenciales."
-        );
+        setMessage("Cuenta creada. Inicia sesion con tus credenciales.");
         setTimeout(() => {
           router.push("/login");
         }, 2000);
@@ -97,21 +92,28 @@ export function RegisterForm() {
   };
 
   return (
-    <AuthForm
-      title="Crear cuenta"
-      subtitle="Únete a ForjaDev Marketplace"
-    >
-      {message && (
+    <AuthForm title="Crear cuenta" subtitle="Unete a ForjaDev Marketplace">
+      <SocialAuthButtons />
+
+      <div className="my-6 flex items-center gap-3">
+        <div className="h-px flex-1 bg-white/10" />
+        <span className="text-xs uppercase tracking-[0.18em] text-[var(--text-soft)]">
+          o crea con email
+        </span>
+        <div className="h-px flex-1 bg-white/10" />
+      </div>
+
+      {message ? (
         <div className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-400">
           {message}
         </div>
-      )}
+      ) : null}
 
-      {error && (
+      {error ? (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
           {error}
         </div>
-      )}
+      ) : null}
 
       <form onSubmit={handleRegister} className="space-y-4">
         <div>
@@ -142,45 +144,41 @@ export function RegisterForm() {
 
         <div>
           <label className="block text-sm font-medium text-white">
-            Contraseña
+            Contrasena
           </label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
-            placeholder="••••••••"
+            placeholder="********"
             disabled={loading}
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-white">
-            Confirmar contraseña
+            Confirmar contrasena
           </label>
           <input
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
-            placeholder="••••••••"
+            placeholder="********"
             disabled={loading}
           />
         </div>
 
-        <Button
-          type="submit"
-          disabled={loading}
-          className="w-full"
-        >
+        <Button type="submit" disabled={loading} className="w-full">
           {loading ? "Creando cuenta..." : "Crear cuenta"}
         </Button>
       </form>
 
       <p className="mt-6 text-center text-sm text-[var(--text-soft)]">
-        ¿Ya tienes cuenta?{" "}
+        Ya tienes cuenta?{" "}
         <Link href="/login" className="text-white hover:underline">
-          Inicia sesión
+          Inicia sesion
         </Link>
       </p>
     </AuthForm>

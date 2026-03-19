@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ModerationActions } from "@/components/admin/moderation-actions";
 import { ModerationStatusPill } from "@/components/admin/moderation-status-pill";
+import { RiskScoreMeter } from "@/components/admin/risk-score-meter";
+import { RiskSeverityPill } from "@/components/admin/risk-severity-pill";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { Button } from "@/components/ui/button";
 import { requireAdminContext } from "@/lib/auth/admin";
@@ -45,6 +47,26 @@ export default async function AdminProductReviewPage({ params }: Props) {
     .eq("entity_id", product.id)
     .order("created_at", { ascending: false })
     .limit(5);
+
+  const { data: moderationFlags } = await supabase
+    .from("moderation_flags")
+    .select("id, flag_code, severity, reason, is_active, created_at")
+    .eq("product_id", product.id)
+    .eq("is_active", true)
+    .order("created_at", { ascending: false });
+
+  const [{ data: productRiskSnapshot }, { data: sellerRiskSnapshot }] = await Promise.all([
+    supabase
+      .from("product_risk_snapshots")
+      .select("risk_score, moderation_flag_count, open_risk_event_count, high_risk_event_count, license_anomaly_count, open_dispute_count, updated_at")
+      .eq("product_id", product.id)
+      .maybeSingle(),
+    supabase
+      .from("seller_risk_snapshots")
+      .select("risk_score, flagged_product_count, open_risk_event_count, high_risk_event_count, license_anomaly_count, open_dispute_count, updated_at")
+      .eq("vendor_id", product.vendor_id)
+      .maybeSingle(),
+  ]);
 
   return (
     <main>
@@ -142,6 +164,22 @@ export default async function AdminProductReviewPage({ params }: Props) {
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <h2 className="text-xl font-semibold text-white">Scoring de riesgo</h2>
+              <div className="mt-4 space-y-5">
+                <RiskScoreMeter score={productRiskSnapshot?.risk_score || 0} label="Producto" />
+                <RiskScoreMeter score={sellerRiskSnapshot?.risk_score || 0} label="Seller" />
+                <div className="grid gap-3 text-sm text-[var(--text-soft)] sm:grid-cols-2">
+                  <p>Flags activos producto: <span className="text-white">{productRiskSnapshot?.moderation_flag_count || 0}</span></p>
+                  <p>Eventos abiertos producto: <span className="text-white">{productRiskSnapshot?.open_risk_event_count || 0}</span></p>
+                  <p>Anomalias producto: <span className="text-white">{productRiskSnapshot?.license_anomaly_count || 0}</span></p>
+                  <p>Disputas abiertas producto: <span className="text-white">{productRiskSnapshot?.open_dispute_count || 0}</span></p>
+                  <p>Productos marcados seller: <span className="text-white">{sellerRiskSnapshot?.flagged_product_count || 0}</span></p>
+                  <p>Eventos abiertos seller: <span className="text-white">{sellerRiskSnapshot?.open_risk_event_count || 0}</span></p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
               <h2 className="text-xl font-semibold text-white">Actividad reciente</h2>
               {auditLogs && auditLogs.length > 0 ? (
                 <div className="mt-4 space-y-3">
@@ -159,6 +197,25 @@ export default async function AdminProductReviewPage({ params }: Props) {
                 </div>
               ) : (
                 <p className="mt-4 text-[var(--text-soft)]">Aun no hay acciones registradas.</p>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <h2 className="text-xl font-semibold text-white">Flags de riesgo</h2>
+              {moderationFlags && moderationFlags.length > 0 ? (
+                <div className="mt-4 space-y-3">
+                  {moderationFlags.map((flag) => (
+                    <div key={flag.id} className="rounded-xl border border-white/10 p-4">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <RiskSeverityPill severity={flag.severity as "low" | "medium" | "high"} />
+                        <p className="font-medium text-white">{flag.flag_code}</p>
+                      </div>
+                      <p className="mt-3 text-sm text-[var(--text-soft)]">{flag.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 text-[var(--text-soft)]">Sin flags activos para este producto.</p>
               )}
             </div>
 

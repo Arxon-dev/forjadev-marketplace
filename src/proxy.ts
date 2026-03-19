@@ -6,11 +6,19 @@ function isProtectedRoute(pathname: string) {
     return true;
   }
 
+  if (pathname === "/feed" || pathname.startsWith("/feed/")) {
+    return true;
+  }
+
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     return true;
   }
 
   if (pathname === "/orders" || pathname.startsWith("/orders/")) {
+    return true;
+  }
+
+  if (pathname === "/disputes" || pathname.startsWith("/disputes/")) {
     return true;
   }
 
@@ -29,8 +37,10 @@ function isProtectedRoute(pathname: string) {
   if (
     pathname === "/seller" ||
     pathname === "/seller/new" ||
+    pathname === "/seller/bundles/new" ||
     pathname === "/seller/onboarding" ||
-    /^\/seller\/[^/]+\/edit$/.test(pathname)
+    /^\/seller\/[^/]+\/edit$/.test(pathname) ||
+    /^\/seller\/bundles\/[^/]+\/edit$/.test(pathname)
   ) {
     return true;
   }
