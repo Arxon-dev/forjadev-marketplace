@@ -127,6 +127,17 @@ export default async function SupportPage({ searchParams }: SupportPageProps) {
             Gestiona incidencias y dudas con sellers desde un flujo unificado para compradores y
             creadores.
           </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link href="/help" className="text-sm font-semibold text-white hover:underline">
+              Help center
+            </Link>
+            <Link
+              href="/policies/soporte-del-marketplace"
+              className="text-sm font-semibold text-white hover:underline"
+            >
+              Policy de soporte
+            </Link>
+          </div>
         </div>
 
         <div className="mb-6 flex flex-wrap gap-3">

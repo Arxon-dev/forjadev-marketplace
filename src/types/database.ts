@@ -292,26 +292,38 @@ export interface Database {
           category_id?: string;
         };
       };
-      product_versions: {
-        Row: {
-          id: string;
-          product_id: string;
-          version: string;
-          changelog: string | null;
-          created_at: string;
+        product_versions: {
+          Row: {
+            id: string;
+            product_id: string;
+            version: string;
+            changelog: string | null;
+            release_status: string;
+            activated_at: string | null;
+            retired_at: string | null;
+            retired_reason: string | null;
+            created_at: string;
+          };
+          Insert: {
+            id?: string;
+            product_id: string;
+            version: string;
+            changelog?: string | null;
+            release_status?: string;
+            activated_at?: string | null;
+            retired_at?: string | null;
+            retired_reason?: string | null;
+            created_at?: string;
+          };
+          Update: {
+            version?: string;
+            changelog?: string | null;
+            release_status?: string;
+            activated_at?: string | null;
+            retired_at?: string | null;
+            retired_reason?: string | null;
+          };
         };
-        Insert: {
-          id?: string;
-          product_id: string;
-          version: string;
-          changelog?: string | null;
-          created_at?: string;
-        };
-        Update: {
-          version?: string;
-          changelog?: string | null;
-        };
-      };
       product_faqs: {
         Row: {
           id: string;
@@ -515,6 +527,162 @@ export interface Database {
         };
         Update: {
           body?: string;
+        };
+      };
+      help_center_categories: {
+        Row: {
+          id: string;
+          slug: string;
+          title: string;
+          description: string | null;
+          icon: string | null;
+          sort_order: number;
+          is_public: boolean;
+          status: "draft" | "published" | "archived";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          title: string;
+          description?: string | null;
+          icon?: string | null;
+          sort_order?: number;
+          is_public?: boolean;
+          status?: "draft" | "published" | "archived";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          slug?: string;
+          title?: string;
+          description?: string | null;
+          icon?: string | null;
+          sort_order?: number;
+          is_public?: boolean;
+          status?: "draft" | "published" | "archived";
+          updated_at?: string;
+        };
+      };
+      help_center_articles: {
+        Row: {
+          id: string;
+          category_id: string;
+          related_product_id: string | null;
+          article_type: "guide" | "policy" | "faq" | "troubleshooting" | "post_sale";
+          audience: "buyer" | "seller" | "shared";
+          slug: string;
+          title: string;
+          summary: string | null;
+          body: string;
+          status: "draft" | "published" | "archived";
+          is_featured: boolean;
+          sort_order: number;
+          created_by_user_id: string | null;
+          published_at: string | null;
+          seo_title: string | null;
+          seo_description: string | null;
+          review_notes: string | null;
+          last_reviewed_at: string | null;
+          updated_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          category_id: string;
+          related_product_id?: string | null;
+          article_type?: "guide" | "policy" | "faq" | "troubleshooting" | "post_sale";
+          audience?: "buyer" | "seller" | "shared";
+          slug: string;
+          title: string;
+          summary?: string | null;
+          body: string;
+          status?: "draft" | "published" | "archived";
+          is_featured?: boolean;
+          sort_order?: number;
+          created_by_user_id?: string | null;
+          published_at?: string | null;
+          seo_title?: string | null;
+          seo_description?: string | null;
+          review_notes?: string | null;
+          last_reviewed_at?: string | null;
+          updated_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          category_id?: string;
+          related_product_id?: string | null;
+          article_type?: "guide" | "policy" | "faq" | "troubleshooting" | "post_sale";
+          audience?: "buyer" | "seller" | "shared";
+          slug?: string;
+          title?: string;
+          summary?: string | null;
+          body?: string;
+          status?: "draft" | "published" | "archived";
+          is_featured?: boolean;
+          sort_order?: number;
+          created_by_user_id?: string | null;
+          published_at?: string | null;
+          seo_title?: string | null;
+          seo_description?: string | null;
+          review_notes?: string | null;
+          last_reviewed_at?: string | null;
+          updated_at?: string;
+        };
+      };
+      marketplace_policy_pages: {
+        Row: {
+          id: string;
+          policy_key: string;
+          title: string;
+          summary: string | null;
+          body: string;
+          audience: "buyer" | "seller" | "shared";
+          status: "draft" | "published" | "archived";
+          sort_order: number;
+          created_by_user_id: string | null;
+          published_at: string | null;
+          seo_title: string | null;
+          seo_description: string | null;
+          review_notes: string | null;
+          last_reviewed_at: string | null;
+          updated_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          policy_key: string;
+          title: string;
+          summary?: string | null;
+          body: string;
+          audience?: "buyer" | "seller" | "shared";
+          status?: "draft" | "published" | "archived";
+          sort_order?: number;
+          created_by_user_id?: string | null;
+          published_at?: string | null;
+          seo_title?: string | null;
+          seo_description?: string | null;
+          review_notes?: string | null;
+          last_reviewed_at?: string | null;
+          updated_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          policy_key?: string;
+          title?: string;
+          summary?: string | null;
+          body?: string;
+          audience?: "buyer" | "seller" | "shared";
+          status?: "draft" | "published" | "archived";
+          sort_order?: number;
+          created_by_user_id?: string | null;
+          published_at?: string | null;
+          seo_title?: string | null;
+          seo_description?: string | null;
+          review_notes?: string | null;
+          last_reviewed_at?: string | null;
+          updated_at?: string;
         };
       };
       product_discussions: {

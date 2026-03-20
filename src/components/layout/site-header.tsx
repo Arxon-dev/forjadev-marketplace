@@ -40,6 +40,12 @@ export function SiteHeader({
           <Link href="/collections" className="text-sm text-[var(--text-soft)] hover:text-white">
             Colecciones
           </Link>
+          <Link href="/help" className="text-sm text-[var(--text-soft)] hover:text-white">
+            Ayuda
+          </Link>
+          <Link href="/policies" className="text-sm text-[var(--text-soft)] hover:text-white">
+            Policies
+          </Link>
           <Link href="/seller" className="text-sm text-[var(--text-soft)] hover:text-white">
             Vender
           </Link>

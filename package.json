@@ -11,6 +11,9 @@
     "start": "next start",
     "lint": "eslint .",
     "smoke:marketplace": "node ./scripts/smoke-marketplace.mjs",
+    "verify:editorial-guardrails": "node ./scripts/verify-editorial-guardrails.mjs",
+    "verify:release-lifecycle": "node ./scripts/verify-release-lifecycle.mjs",
+    "verify:product-promotions-workspace": "node ./scripts/verify-product-promotions-workspace.mjs",
     "verify:checkout-lifecycle": "node ./scripts/verify-checkout-lifecycle.mjs",
     "verify:download-license-lifecycle": "node ./scripts/verify-download-license-lifecycle.mjs"
   },

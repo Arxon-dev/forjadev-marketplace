@@ -13,7 +13,7 @@ import { FileUpload } from "@/components/ui/file-upload";
 
 interface ProductFormProps {
   productId?: string;
-  onSuccess: () => void;
+  onSuccess: (savedProductId?: string) => void;
 }
 
 interface GameOption {
@@ -287,13 +287,16 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
         );
       }
 
-      const { data: versionData } = await supabase
+      const { data: versionRows } = await supabase
         .from("product_versions")
-        .select("id, version, created_at")
+        .select("id, version, release_status, created_at")
         .eq("product_id", productId)
         .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(5);
+
+      const versionData =
+        (versionRows || []).find((version) => version.release_status === "active") ||
+        (versionRows || [])[0];
 
       if (!versionData) {
         return;
@@ -767,7 +770,7 @@ export function ProductForm({ productId, onSuccess }: ProductFormProps) {
         }
       }
 
-      onSuccess();
+      onSuccess(savedProductId);
     } catch (err: unknown) {
       const errorMessage =
         err instanceof Error ? err.message : "Error al guardar el producto";

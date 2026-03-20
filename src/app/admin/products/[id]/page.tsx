@@ -37,7 +37,7 @@ export default async function AdminProductReviewPage({ params }: Props) {
 
   const { data: versions } = await supabase
     .from("product_versions")
-    .select("id, version, changelog, created_at")
+    .select("id, version, changelog, release_status, retired_reason, created_at")
     .eq("product_id", product.id)
     .order("created_at", { ascending: false });
 
@@ -118,7 +118,12 @@ export default async function AdminProductReviewPage({ params }: Props) {
                   {versions.map((version) => (
                     <div key={version.id} className="rounded-xl border border-white/10 p-4">
                       <div className="flex items-center justify-between gap-4">
-                        <p className="font-medium text-white">{version.version}</p>
+                        <div className="flex items-center gap-3">
+                          <p className="font-medium text-white">{version.version}</p>
+                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[var(--text-soft)]">
+                            {version.release_status}
+                          </span>
+                        </div>
                         <p className="text-xs text-[var(--text-soft)]">
                           {new Date(version.created_at).toLocaleString("es-ES")}
                         </p>
@@ -126,6 +131,11 @@ export default async function AdminProductReviewPage({ params }: Props) {
                       <p className="mt-3 whitespace-pre-wrap text-sm text-[var(--text-soft)]">
                         {version.changelog || "Sin changelog."}
                       </p>
+                      {version.retired_reason ? (
+                        <p className="mt-3 text-xs text-amber-300">
+                          Motivo de retirada: {version.retired_reason}
+                        </p>
+                      ) : null}
                     </div>
                   ))}
                 </div>

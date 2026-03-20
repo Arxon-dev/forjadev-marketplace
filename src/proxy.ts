@@ -39,7 +39,7 @@ function isProtectedRoute(pathname: string) {
     pathname === "/seller/new" ||
     pathname === "/seller/bundles/new" ||
     pathname === "/seller/onboarding" ||
-    /^\/seller\/[^/]+\/edit$/.test(pathname) ||
+    /^\/seller\/products\/[^/]+\/edit$/.test(pathname) ||
     /^\/seller\/bundles\/[^/]+\/edit$/.test(pathname)
   ) {
     return true;

@@ -31,10 +31,14 @@ interface TicketPageProps {
   params: Promise<{
     ticketId: string;
   }>;
+  searchParams?: Promise<{
+    workspaceProductId?: string;
+  }>;
 }
 
-export default async function SupportTicketPage({ params }: TicketPageProps) {
+export default async function SupportTicketPage({ params, searchParams }: TicketPageProps) {
   const { ticketId } = await params;
+  const resolvedSearchParams = (await searchParams) || {};
   const supabase = await createClient();
   const {
     data: { user },
@@ -68,6 +72,8 @@ export default async function SupportTicketPage({ params }: TicketPageProps) {
 
   const isBuyer = ticket.buyer_user_id === user.id;
   const isSeller = vendorResult.data?.user_id === user.id;
+  const workspaceProductId =
+    resolvedSearchParams.workspaceProductId === ticket.product_id ? ticket.product_id : null;
 
   if (!isBuyer && !isSeller) {
     notFound();
@@ -118,9 +124,15 @@ export default async function SupportTicketPage({ params }: TicketPageProps) {
               </div>
 
               <div className="mt-5 flex flex-wrap gap-3">
-                <Link href="/support">
-                  <Button variant="secondary">Volver a soporte</Button>
-                </Link>
+                {workspaceProductId && isSeller ? (
+                  <Link href={`/seller/products/${workspaceProductId}/support`}>
+                    <Button variant="secondary">Volver al soporte del producto</Button>
+                  </Link>
+                ) : (
+                  <Link href="/support">
+                    <Button variant="secondary">Volver a soporte</Button>
+                  </Link>
+                )}
                 <SupportTicketActions ticketId={ticket.id} status={ticket.status} />
                 {productResult.data?.slug ? (
                   <Link href={`/products/${productResult.data.slug}`}>

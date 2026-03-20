@@ -20,6 +20,7 @@ type ProductVersionRow = {
   id: string;
   version: string;
   created_at: string;
+  release_status: "pending" | "active" | "historical" | "retired";
 };
 
 type ProductFileRow = {
@@ -168,9 +169,9 @@ export async function resolveDownloadAccess(
 
   const { data: versions, error: versionError } = await supabase
     .from("product_versions")
-    .select("id, version, created_at")
+    .select("id, version, created_at, release_status")
     .eq("product_id", productId)
-    .order("created_at", { ascending: false })
+    .eq("release_status", "active")
     .returns<ProductVersionRow[]>();
 
   if (versionError) {
@@ -185,7 +186,7 @@ export async function resolveDownloadAccess(
     return {
       ok: false,
       status: 409,
-      message: "Este producto aun no tiene versiones publicadas",
+      message: "Este producto aun no tiene una release activa disponible",
     };
   }
 

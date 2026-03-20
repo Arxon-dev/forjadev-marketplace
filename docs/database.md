@@ -40,6 +40,9 @@
 - licenses
 - audit_logs
 - marketplace_events
+- help_center_categories
+- help_center_articles
+- marketplace_policy_pages
 
 ## Moderation
 - `products.moderation_status` controls public visibility
@@ -67,6 +70,9 @@
 - product metrics and seller trust snapshots are automatically refreshed by database triggers when products, reviews, downloads, order items or order status change
 - `support_tickets` stores buyer-seller support threads scoped to a product and seller
 - `support_messages` stores the conversation history for each ticket and automatically updates ticket activity timestamps
+- `help_center_categories` stores the public support/documentation taxonomy for buyer and seller help content
+- `help_center_articles` stores public editorial articles for troubleshooting, onboarding, post-sale help and reusable trust guidance
+- `marketplace_policy_pages` stores marketplace-wide public policy pages such as purchases, refunds, licenses and trust rules
 - `product_discussions` stores public community threads attached to approved product pages
 - `discussion_messages` stores replies inside each public product discussion and refreshes thread activity timestamps
 - `collections` stores public or private user-curated lists of products for discovery and recurring engagement

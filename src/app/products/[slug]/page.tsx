@@ -143,8 +143,9 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
 
   const { data: versions } = await supabase
     .from("product_versions")
-    .select("id, version, changelog, created_at")
+    .select("id, version, changelog, created_at, release_status")
     .eq("product_id", product.id)
+    .in("release_status", ["active", "historical"])
     .order("created_at", { ascending: false });
 
   const { data: faqs } = await supabase
@@ -183,7 +184,12 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   );
 
   const latestVersion =
-    versions?.find((version) => downloadableVersionIds.has(version.id)) || versions?.[0] || null;
+    versions?.find(
+      (version) => version.release_status === "active" && downloadableVersionIds.has(version.id)
+    ) ||
+    versions?.find((version) => downloadableVersionIds.has(version.id)) ||
+    versions?.[0] ||
+    null;
 
   const isOwner = Boolean(user && vendor?.user_id === user.id);
   const isAdmin = profile?.role === "admin";
@@ -586,6 +592,20 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                       </p>
                     </div>
                   ) : null}
+                </div>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <Link
+                    href="/help"
+                    className="inline-flex rounded-2xl border border-white/10 bg-black/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                  >
+                    Abrir help center
+                  </Link>
+                  <Link
+                    href="/policies/reembolsos-y-reclamaciones"
+                    className="inline-flex rounded-2xl border border-white/10 bg-black/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                  >
+                    Ver policy de reembolsos
+                  </Link>
                 </div>
               </div>
             ) : null}

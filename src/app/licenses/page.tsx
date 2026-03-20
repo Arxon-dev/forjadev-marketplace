@@ -33,6 +33,17 @@ export default async function LicensesPage() {
         <p className="mt-3 max-w-2xl text-[var(--text-soft)]">
           Gestiona las claves emitidas para tus compras y vuelve rapidamente a cada producto.
         </p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Link href="/help" className="text-sm font-semibold text-white hover:underline">
+            Help center
+          </Link>
+          <Link
+            href="/policies/licencias-y-validacion"
+            className="text-sm font-semibold text-white hover:underline"
+          >
+            Policy de licencias
+          </Link>
+        </div>
 
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           <div className="rounded-3xl border border-white/10 bg-white/5 p-5">

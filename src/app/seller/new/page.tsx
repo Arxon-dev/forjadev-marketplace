@@ -7,8 +7,8 @@ import { ProductForm } from "@/components/seller/product-form";
 export default function SellerNewProductPage() {
   const router = useRouter();
 
-  const handleSuccess = () => {
-    router.push("/seller");
+  const handleSuccess = (savedProductId?: string) => {
+    router.push(savedProductId ? `/seller/products/${savedProductId}` : "/seller");
   };
 
   return (

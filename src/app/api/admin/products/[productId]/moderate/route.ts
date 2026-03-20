@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { recordAuditLog } from "@/lib/audit";
+import { activateRelease, retireRelease } from "@/lib/seller/release-lifecycle";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -54,9 +55,58 @@ export async function POST(
   }
 
   const adminSupabase = createAdminClient();
-  const newStatus = ACTION_STATUS[action];
-
   const adminProducts = adminSupabase.from("products") as any;
+  const adminVersions = adminSupabase.from("product_versions") as any;
+
+  const { data: currentProduct } = await adminProducts
+    .select("id, title, moderation_status")
+    .eq("id", productId)
+    .single();
+
+  if (!currentProduct) {
+    return NextResponse.json({ message: "Producto no encontrado" }, { status: 404 });
+  }
+
+  const { data: pendingRelease } = await adminVersions
+    .select("id, version")
+    .eq("product_id", productId)
+    .eq("release_status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (pendingRelease && action === "approve") {
+    try {
+      await activateRelease(adminSupabase, productId, pendingRelease.id);
+    } catch (error) {
+      return NextResponse.json(
+        {
+          message:
+            error instanceof Error ? error.message : "No se pudo activar la release pendiente",
+        },
+        { status: 409 }
+      );
+    }
+  }
+
+  if (pendingRelease && action === "reject") {
+    try {
+      await retireRelease(adminSupabase, productId, pendingRelease.id, `admin_rejected:${reason}`);
+    } catch (error) {
+      return NextResponse.json(
+        {
+          message:
+            error instanceof Error ? error.message : "No se pudo retirar la release pendiente",
+        },
+        { status: 409 }
+      );
+    }
+  }
+
+  const newStatus =
+    pendingRelease && currentProduct.moderation_status === "approved" && action === "reject"
+      ? "approved"
+      : ACTION_STATUS[action];
 
   const { data: product, error: productError } = await adminProducts
     .update({
@@ -80,10 +130,11 @@ export async function POST(
     action: `product.${action}`,
     entityType: "product",
     entityId: productId,
-    metadata: {
-      new_status: newStatus,
-      reason,
-    },
+      metadata: {
+        new_status: newStatus,
+        reason,
+        moderated_pending_release: pendingRelease?.id || null,
+      },
   });
 
   if (auditError) {

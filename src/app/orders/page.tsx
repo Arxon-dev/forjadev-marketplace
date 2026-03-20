@@ -31,6 +31,23 @@ export default async function OrdersPage() {
         <p className="mt-3 max-w-2xl text-[var(--text-soft)]">
           Revisa tus compras, tus licencias y vuelve a cada producto desde un historial dedicado.
         </p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Link href="/help" className="text-sm font-semibold text-white hover:underline">
+            Help center
+          </Link>
+          <Link
+            href="/policies/compras-y-acceso"
+            className="text-sm font-semibold text-white hover:underline"
+          >
+            Policy de compras
+          </Link>
+          <Link
+            href="/policies/reembolsos-y-reclamaciones"
+            className="text-sm font-semibold text-white hover:underline"
+          >
+            Reembolsos y reclamaciones
+          </Link>
+        </div>
 
         {orders && orders.length > 0 ? (
           <div className="mt-10 space-y-4">

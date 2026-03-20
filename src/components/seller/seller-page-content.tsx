@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { SellerAnalyticsPanel } from "./seller-analytics-panel";
 import { SellerCampaignManager } from "./seller-campaign-manager";
+import { SellerProductOperationsPanel } from "./seller-product-operations-panel";
 import { SellerSales } from "./seller-sales";
 import { SellerStats } from "./seller-stats";
 import { SellerStoreProfileForm } from "./seller-store-profile-form";
@@ -17,7 +18,6 @@ interface SellerPageProps {
 
 export function SellerPageContent({ userId }: SellerPageProps) {
   const [vendor, setVendor] = useState<any>(null);
-  const [products, setProducts] = useState<any[]>([]);
   const [bundles, setBundles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSeller, setIsSeller] = useState(false);
@@ -44,12 +44,7 @@ export function SellerPageContent({ userId }: SellerPageProps) {
         if (vendorData) {
           setVendor(vendorData);
 
-          const [{ data: productsData }, { data: bundlesData }] = await Promise.all([
-            supabase
-              .from("products")
-              .select("*")
-              .eq("vendor_id", vendorData.id)
-              .order("created_at", { ascending: false }),
+          const [{ data: bundlesData }] = await Promise.all([
             supabase
               .from("bundles")
               .select("*")
@@ -57,7 +52,6 @@ export function SellerPageContent({ userId }: SellerPageProps) {
               .order("updated_at", { ascending: false }),
           ]);
 
-          setProducts(productsData || []);
           setBundles(bundlesData || []);
         }
       }
@@ -144,41 +138,11 @@ export function SellerPageContent({ userId }: SellerPageProps) {
         </div>
       ) : null}
 
-      <div>
-        <h2 className="mb-6 text-xl font-semibold text-white">Mis productos</h2>
-        {products.length === 0 ? (
-          <div className="rounded-lg border border-white/10 bg-white/5 px-8 py-12 text-center backdrop-blur">
-            <p className="text-[var(--text-soft)]">No tienes productos aun.</p>
-            <Link href="/seller/new" className="mt-4 inline-block">
-              <Button>Crear primer producto</Button>
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {products.map((product) => (
-              <div
-                key={product.id}
-                className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-4 backdrop-blur"
-              >
-                <div>
-                  <h3 className="font-semibold text-white">{product.title}</h3>
-                  <p className="text-sm text-[var(--text-soft)]">
-                    Estado: <span className="capitalize">{product.moderation_status}</span>
-                  </p>
-                  {product.rejection_reason ? (
-                    <p className="mt-1 text-sm text-amber-300">
-                      Motivo: {product.rejection_reason}
-                    </p>
-                  ) : null}
-                </div>
-                <Link href={`/seller/${product.id}/edit`}>
-                  <Button variant="ghost">Editar</Button>
-                </Link>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {vendor?.id ? (
+        <div>
+          <SellerProductOperationsPanel vendorId={vendor.id} />
+        </div>
+      ) : null}
 
       <div className="mt-12">
         <h2 className="mb-6 text-xl font-semibold text-white">Mis bundles</h2>

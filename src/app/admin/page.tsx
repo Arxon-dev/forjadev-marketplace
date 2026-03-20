@@ -112,6 +112,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <Link href="/admin/support">
             <Button variant="secondary">Support Ops</Button>
           </Link>
+          <Link href="/admin/editorial">
+            <Button variant="secondary">Editorial</Button>
+          </Link>
           <Link href="/admin/risk">
             <Button variant="secondary">Risk Ops</Button>
           </Link>
