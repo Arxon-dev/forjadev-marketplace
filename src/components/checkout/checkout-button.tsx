@@ -62,6 +62,7 @@ export function CheckoutButton({
       const payload = (await response.json().catch(() => null)) as
         | {
             message?: string;
+            orderId?: string;
             couponCode?: string | null;
             discountCents?: number;
             totalCents?: number;
@@ -84,7 +85,7 @@ export function CheckoutButton({
       router.refresh();
 
       setTimeout(() => {
-        router.push("/dashboard");
+        router.push(payload?.orderId ? `/orders?highlightOrder=${payload.orderId}` : "/orders");
       }, 800);
     } catch {
       setError("No se pudo completar la compra");
