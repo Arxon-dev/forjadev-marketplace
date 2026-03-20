@@ -1,5 +1,14 @@
 # Verification
 
+## Current source of truth
+
+This document tracks the verification entry points that are currently expected to pass against the real marketplace implementation.
+
+For seller product operations and editorial guardrails, also see:
+
+- `docs/seller_product_operations.md`
+- `docs/editorial_guardrails.md`
+
 ## Quick smoke check
 
 Run:
@@ -15,6 +24,46 @@ This verifies against the configured Supabase project that:
 - `audit_logs` is readable with service-role access
 - `licenses` remains reachable for operational inspection
 
+## Functional verification scripts
+
+Run these scripts when validating the corresponding capability area:
+
+```bash
+npm run verify:checkout-lifecycle
+npm run verify:download-license-lifecycle
+npm run verify:buyer-postpurchase-hub
+npm run verify:release-lifecycle
+npm run verify:product-promotions-workspace
+npm run verify:editorial-guardrails
+```
+
+Coverage summary:
+
+- `verify:checkout-lifecycle`
+  - checkout creation
+  - duplicate-checkout protection
+  - order and license issuance
+- `verify:download-license-lifecycle`
+  - buyer download access
+  - revocation blocking
+  - license reactivation recovery
+- `verify:buyer-postpurchase-hub`
+  - `/orders` as buyer post-purchase hub
+  - highlighted order confirmation
+  - redownload support
+  - blocked access for revoked or missing ownership
+- `verify:release-lifecycle`
+  - seller release lifecycle transitions
+  - buyer download pinned to `active`
+  - admin approve/reject on `pending`
+- `verify:product-promotions-workspace`
+  - seller ownership on product promotions
+  - product campaigns and coupons inside the workspace
+- `verify:editorial-guardrails`
+  - admin-only previews
+  - published-only public visibility
+  - slug protection rules
+
 ## Recommended manual flow
 
 1. Register a fresh buyer and confirm `profiles` is created automatically.
@@ -23,6 +72,19 @@ This verifies against the configured Supabase project that:
 4. Revisit the product page and confirm download is enabled after purchase.
 5. Revoke the license from `/admin/licenses` and confirm the product download becomes blocked.
 6. Review `/admin/audit` and confirm moderation, checkout and download events appear.
+
+## Recommended buyer manual flow
+
+1. Complete a purchase from an approved paid product.
+2. Confirm the redirect lands on `/orders?highlightOrder=...`.
+3. Verify the purchased product appears with:
+   - access state
+   - license state
+   - download or redownload action
+   - support and dispute continuity
+4. Download the product successfully.
+5. Revisit `/orders` and confirm redownload remains available.
+6. Revoke the license from `/admin/licenses` and confirm `/orders` explains the block clearly.
 
 ## Safe lifecycle verification
 

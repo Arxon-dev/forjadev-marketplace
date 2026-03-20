@@ -24,6 +24,8 @@
 - /dashboard
 - /feed
 - /seller
+- /seller/new
+- /seller/onboarding
 - /admin
 - /admin/analytics
 - /admin/campaigns
@@ -41,6 +43,7 @@
 - /admin/support
 - /admin/audit
 - /admin/licenses
+- /admin/products/[id]
 - /seller/products/[id]
 - /seller/products/[id]/edit
 - /seller/products/[id]/promotions

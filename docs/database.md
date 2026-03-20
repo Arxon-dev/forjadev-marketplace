@@ -49,6 +49,13 @@
 - `products.rejection_reason` stores feedback for rejected listings
 - `audit_logs` records admin moderation actions
 
+## Release lifecycle
+- `product_versions.release_status` is the source of truth for seller release lifecycle state
+- allowed values are `pending`, `active`, `historical`, `retired`
+- buyer downloads resolve only the `active` release
+- each product can have at most one `active` release and at most one `pending` release
+- `product_versions.activated_at`, `retired_at` and `retired_reason` preserve operational traceability for release transitions
+
 ## Discovery and taxonomy
 - `games` defines the primary game taxonomy for the catalog
 - `categories` now supports parent-child hierarchy, activation and sort order
@@ -87,6 +94,7 @@
 - `product_risk_snapshots` persists a normalized operational risk score per product for moderation prioritization
 - `seller_risk_snapshots` persists a normalized operational risk score per seller for admin risk triage and intelligence weighting
 - published product releases generate buyer notifications automatically when a new product file is attached to a version for an approved product
+- `/orders` now acts as the buyer post-purchase hub by combining orders, licenses, download eligibility, support entry points and dispute continuity over these tables
 
 ## Security notes
 - RLS on all user-owned tables
