@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { MarketplaceTracker } from "@/components/analytics/marketplace-tracker";
 import { BrowseCategories } from "@/components/home/browse-categories";
 import { DiscoveryRail } from "@/components/home/discovery-rail";
@@ -6,6 +7,7 @@ import { Hero } from "@/components/marketplace/hero";
 import { getPersonalizedRecommendations } from "@/lib/intelligence/recommendations";
 import type { PublicDeal } from "@/lib/promotions/public";
 import { getPublicDealsForBundles, getPublicDealsForProducts, getPublicFeaturedPlacements } from "@/lib/promotions/public";
+import { buildPublicMetadata } from "@/lib/seo/public-metadata";
 import { createClient } from "@/lib/supabase/server";
 
 interface DiscoveryProductRow {
@@ -116,6 +118,13 @@ function pickUniqueProducts(
 
   return nextProducts;
 }
+
+export const metadata: Metadata = buildPublicMetadata({
+  title: "Marketplace premium para plugins, mapas y herramientas",
+  description:
+    "Descubre productos destacados, categorias activas, juegos compatibles y bundles listos para compra dentro de ForjaDev.",
+  path: "/",
+});
 
 export default async function HomePage() {
   const supabase = await createClient();

@@ -1,13 +1,19 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { DisputeForm } from "@/components/community/dispute-form";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
+import { BuyerPostSaleClarityCard } from "@/components/post-sale/buyer-post-sale-clarity-card";
 import { SupportTicketActions } from "@/components/support/support-ticket-actions";
 import { SupportMessageForm } from "@/components/support/support-message-form";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { buildBuyerPostSaleTransparencySnapshot } from "@/lib/post-sale/buyer-transparency";
 import { createClient } from "@/lib/supabase/server";
 
 type SupportTicketStatus = "open" | "waiting_seller" | "waiting_buyer" | "closed";
 type SupportTicketPriority = "normal" | "high";
+type DisputeStatus = "open" | "reviewing" | "resolved" | "rejected";
+type LicenseStatus = "active" | "revoked";
 
 interface SupportTicketDetail {
   id: string;
@@ -18,6 +24,40 @@ interface SupportTicketDetail {
   status: SupportTicketStatus;
   priority: SupportTicketPriority;
   created_at: string;
+  updated_at: string;
+}
+
+interface OwnedItemDetail {
+  id: string;
+  price_cents: number;
+  order:
+    | {
+        id: string;
+        user_id: string;
+        status: string;
+        created_at: string;
+      }
+    | Array<{
+        id: string;
+        user_id: string;
+        status: string;
+        created_at: string;
+      }>
+    | null;
+  license:
+    | {
+        id: string;
+        status: LicenseStatus;
+        license_key: string;
+        issued_at: string;
+      }
+    | Array<{
+        id: string;
+        status: LicenseStatus;
+        license_key: string;
+        issued_at: string;
+      }>
+    | null;
 }
 
 const STATUS_LABELS = {
@@ -26,6 +66,59 @@ const STATUS_LABELS = {
   waiting_buyer: "Esperando buyer",
   closed: "Cerrado",
 } as const;
+
+function nextActionLabel(status: SupportTicketStatus) {
+  switch (status) {
+    case "waiting_seller":
+      return "Ahora corresponde al seller responder.";
+    case "waiting_buyer":
+      return "Necesitas responder para mantener el caso en movimiento.";
+    case "closed":
+      return "El ticket esta cerrado. Reabrelo o escala si el problema persiste.";
+    default:
+      return "El caso sigue abierto y puede avanzar por soporte normal.";
+  }
+}
+
+function disputeBadgeClass(status: DisputeStatus) {
+  switch (status) {
+    case "open":
+      return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+    case "reviewing":
+      return "border-sky-500/30 bg-sky-500/10 text-sky-300";
+    case "resolved":
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
+    case "rejected":
+      return "border-rose-500/30 bg-rose-500/10 text-rose-300";
+  }
+}
+
+function disputeLabel(status: DisputeStatus) {
+  switch (status) {
+    case "open":
+      return "Disputa abierta";
+    case "reviewing":
+      return "Disputa en revision";
+    case "resolved":
+      return "Disputa resuelta";
+    case "rejected":
+      return "Disputa rechazada";
+  }
+}
+
+function normalizeOwnedItemDetail(rawItem: OwnedItemDetail | null) {
+  if (!rawItem) {
+    return {
+      order: null,
+      license: null,
+    };
+  }
+
+  return {
+    order: Array.isArray(rawItem.order) ? rawItem.order[0] || null : rawItem.order,
+    license: Array.isArray(rawItem.license) ? rawItem.license[0] || null : rawItem.license,
+  };
+}
 
 interface TicketPageProps {
   params: Promise<{
@@ -50,7 +143,7 @@ export default async function SupportTicketPage({ params, searchParams }: Ticket
 
   const { data: ticketData } = await supabase
     .from("support_tickets")
-    .select("id, product_id, vendor_id, buyer_user_id, subject, status, priority, created_at")
+    .select("id, product_id, vendor_id, buyer_user_id, subject, status, priority, created_at, updated_at")
     .eq("id", ticketId)
     .single();
 
@@ -60,14 +153,31 @@ export default async function SupportTicketPage({ params, searchParams }: Ticket
     notFound();
   }
 
-  const [messagesResult, productResult, vendorResult] = await Promise.all([
+  const [messagesResult, productResult, vendorResult, ownedItemResult, disputesResult] = await Promise.all([
     supabase
       .from("support_messages")
       .select("id, sender_user_id, body, created_at")
       .eq("ticket_id", ticket.id)
       .order("created_at", { ascending: true }),
-    supabase.from("products").select("id, title, slug").eq("id", ticket.product_id).maybeSingle(),
+    supabase.from("products").select("id, title, slug, refund_policy").eq("id", ticket.product_id).maybeSingle(),
     supabase.from("vendors").select("id, user_id, store_name, slug").eq("id", ticket.vendor_id).maybeSingle(),
+    supabase
+      .from("order_items")
+      .select(
+        "id, price_cents, order:orders!inner(id, user_id, status, created_at), license:licenses(id, status, license_key, issued_at)"
+      )
+      .eq("product_id", ticket.product_id)
+      .eq("order.user_id", ticket.buyer_user_id)
+      .in("order.status", ["completed", "refunded"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("disputes")
+      .select("id, order_id, product_id, license_id, status, updated_at")
+      .eq("opened_by_user_id", ticket.buyer_user_id)
+      .eq("product_id", ticket.product_id)
+      .order("updated_at", { ascending: false }),
   ]);
 
   const isBuyer = ticket.buyer_user_id === user.id;
@@ -80,6 +190,27 @@ export default async function SupportTicketPage({ params, searchParams }: Ticket
   }
 
   const messages = messagesResult.data || [];
+  const ownedItem = normalizeOwnedItemDetail((ownedItemResult.data || null) as unknown as OwnedItemDetail | null);
+  const license = ownedItem.license;
+  const activeDispute =
+    (disputesResult.data || []).find(
+      (dispute) => dispute.status === "open" || dispute.status === "reviewing"
+    ) || null;
+  const transparencySnapshot = buildBuyerPostSaleTransparencySnapshot({
+    orderStatus: ownedItem.order?.status,
+    accessOk: license?.status === "active",
+    accessMessage:
+      license?.status === "revoked"
+        ? "Licencia revocada"
+        : ownedItem.order?.id
+          ? "Compra registrada"
+          : "Compra no resuelta",
+    licenseStatus: license?.status || null,
+    hasDownload: false,
+    supportStatuses: [ticket.status],
+    disputeStatuses: activeDispute ? [activeDispute.status as DisputeStatus] : [],
+    productRefundPolicy: productResult.data?.refund_policy || null,
+  });
 
   return (
     <main>
@@ -121,6 +252,31 @@ export default async function SupportTicketPage({ params, searchParams }: Ticket
                     {new Date(ticket.created_at).toLocaleString("es-ES")}
                   </span>
                 </p>
+                <p>
+                  Siguiente accion: <span className="text-white">{nextActionLabel(ticket.status)}</span>
+                </p>
+                <p>
+                  Pedido relacionado:{" "}
+                  <span className="text-white">
+                    {ownedItem?.order?.id ? `#${ownedItem.order.id.slice(0, 8)}` : "No resuelto"}
+                  </span>
+                </p>
+                <p>
+                  Licencia:{" "}
+                  <span className="text-white">
+                    {license?.status === "active"
+                      ? "Activa"
+                      : license?.status === "revoked"
+                        ? "Revocada"
+                        : "Sin licencia emitida"}
+                  </span>
+                </p>
+                <p>
+                  Ultima actividad:{" "}
+                  <span className="text-white">
+                    {new Date(ticket.updated_at).toLocaleString("es-ES")}
+                  </span>
+                </p>
               </div>
 
               <div className="mt-5 flex flex-wrap gap-3">
@@ -134,11 +290,68 @@ export default async function SupportTicketPage({ params, searchParams }: Ticket
                   </Link>
                 )}
                 <SupportTicketActions ticketId={ticket.id} status={ticket.status} />
+                {ownedItem?.order?.id ? (
+                  <Link href={`/orders?highlightOrder=${ownedItem.order.id}`}>
+                    <Button variant="ghost">Ver pedido</Button>
+                  </Link>
+                ) : null}
                 {productResult.data?.slug ? (
                   <Link href={`/products/${productResult.data.slug}`}>
                     <Button variant="ghost">Ver producto</Button>
                   </Link>
                 ) : null}
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-white/10 bg-black/10 p-4">
+                <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-soft)]">
+                  Escalado administrativo
+                </p>
+                {activeDispute ? (
+                  <div className="mt-3 space-y-3">
+                    <Badge className={disputeBadgeClass(activeDispute.status as DisputeStatus)}>
+                      {disputeLabel(activeDispute.status as DisputeStatus)}
+                    </Badge>
+                    <p className="text-sm text-[var(--text-soft)]">
+                      Este caso ya esta escalado al marketplace. Puedes seguir el estado desde la
+                      bandeja de disputas.
+                    </p>
+                    <Link href="/disputes">
+                      <Button variant="secondary">Ver disputa</Button>
+                    </Link>
+                  </div>
+                ) : isBuyer && ownedItem?.order?.id ? (
+                  <div className="mt-3 space-y-3">
+                    <p className="text-sm text-[var(--text-soft)]">
+                      Si soporte no resuelve el problema de forma razonable, puedes abrir disputa con
+                      el contexto de este producto, pedido y licencia.
+                    </p>
+                    <DisputeForm
+                      orderId={ownedItem.order.id}
+                      productId={ticket.product_id}
+                      licenseId={license?.id || null}
+                      productTitle={productResult.data?.title || "Producto"}
+                    />
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-[var(--text-soft)]">
+                    El escalado administrativo solo esta disponible para el buyer propietario de esta
+                    compra.
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-6">
+                <BuyerPostSaleClarityCard snapshot={transparencySnapshot} />
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Link href="/policies/reembolsos-y-reclamaciones">
+                    <Button variant="secondary">Policy de reembolsos</Button>
+                  </Link>
+                  {ownedItem?.order?.id ? (
+                    <Link href={`/orders?highlightOrder=${ownedItem.order.id}`}>
+                      <Button variant="ghost">Ver pedido</Button>
+                    </Link>
+                  ) : null}
+                </div>
               </div>
             </div>
 

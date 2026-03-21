@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
 import { MarketplaceTracker } from "@/components/analytics/marketplace-tracker";
+import { DiscoveryNavSpine } from "@/components/discovery/discovery-nav-spine";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
+import { CommerceSectionHeading } from "@/components/marketplace/commerce-surface-system";
 import { ProductCard } from "@/components/marketplace/product-card";
 import { ProductFilters } from "@/components/marketplace/product-filters";
 import { computeQualityTrustScore } from "@/lib/intelligence/catalog";
+import { buildShoppingQualitySnapshot } from "@/lib/marketplace/quality-signals";
 import { getPublicDealsForProducts } from "@/lib/promotions/public";
+import { buildCatalogListingMetadata } from "@/lib/seo/public-metadata";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,6 +20,35 @@ interface ProductsPageProps {
     game?: string;
     category?: string;
   }>;
+}
+
+export async function generateMetadata({
+  searchParams,
+}: ProductsPageProps): Promise<Metadata> {
+  const params = (await searchParams) || {};
+  const query = params.q?.trim() || "";
+  const pricing = params.pricing || "all";
+  const sort = params.sort || "newest";
+  const game = params.game || "all";
+  const category = params.category || "all";
+
+  const supabase = await createClient();
+  const [{ data: games }, { data: categories }] = await Promise.all([
+    game !== "all"
+      ? supabase.from("games").select("name, slug").eq("slug", game).maybeSingle()
+      : Promise.resolve({ data: null }),
+    category !== "all"
+      ? supabase.from("categories").select("name, slug").eq("slug", category).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  return buildCatalogListingMetadata({
+    searchQuery: query,
+    pricing,
+    sort,
+    gameName: games?.name || null,
+    categoryName: categories?.name || null,
+  });
 }
 
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
@@ -72,7 +106,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   let productsQuery = supabase
     .from("products")
     .select(
-      "id, vendor_id, title, slug, price_cents, is_free, compatibility, featured_image_url, category_id, game_id, featured, rating_average, rating_count, download_count, purchase_count, created_at, updated_at"
+      "id, vendor_id, title, slug, price_cents, is_free, compatibility, featured_image_url, category_id, game_id, featured, rating_average, rating_count, download_count, purchase_count, created_at, updated_at, support_policy, refund_policy, update_policy"
     )
     .eq("moderation_status", "approved");
 
@@ -216,20 +250,63 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
   const [vendorsResult, productCategoriesResult] = await Promise.all([
     vendorIds.length > 0
-      ? supabase.from("vendors").select("id, store_name").in("id", vendorIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; store_name: string }> }),
+      ? supabase.from("vendors").select("id, user_id, store_name").in("id", vendorIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; user_id: string; store_name: string }> }),
     categoryIds.length > 0
       ? supabase.from("categories").select("id, name").in("id", categoryIds)
       : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
   ]);
+  const vendorRows = vendorsResult.data || [];
+  const vendorUserIds = Array.from(new Set(vendorRows.map((vendor) => vendor.user_id).filter(Boolean)));
+  const [sellerSnapshotsResult, identitiesResult] = await Promise.all([
+    vendorIds.length > 0
+      ? adminSupabase
+          .from("seller_reputation_snapshots")
+          .select("vendor_id, approved_products, total_purchases, latest_product_update_at")
+          .in("vendor_id", vendorIds)
+      : Promise.resolve({
+          data: [] as Array<{
+            vendor_id: string;
+            approved_products: number;
+            total_purchases: number;
+            latest_product_update_at: string | null;
+          }>,
+        }),
+    vendorUserIds.length > 0
+      ? adminSupabase.from("user_provider_identities").select("user_id").in("user_id", vendorUserIds)
+      : Promise.resolve({ data: [] as Array<{ user_id: string }> }),
+  ]);
 
   const vendorById = new Map(
-    (vendorsResult.data || []).map((vendor) => [vendor.id, vendor.store_name])
+    vendorRows.map((vendor) => [vendor.id, vendor.store_name])
   );
+  const vendorUserIdByVendorId = new Map(vendorRows.map((vendor) => [vendor.id, vendor.user_id]));
+  const snapshotByVendorId = new Map(
+    (sellerSnapshotsResult.data || []).map((snapshot) => [snapshot.vendor_id, snapshot])
+  );
+  const verifiedUserIds = new Set((identitiesResult.data || []).map((identity) => identity.user_id));
   const categoryById = new Map(
     (productCategoriesResult.data || []).map((item) => [item.id, item.name])
   );
   const dealsByProductId = await getPublicDealsForProducts(products || []);
+  const rootCategories = (categories || []).filter((item) => item.parent_id === null);
+  const selectedCategory = (categories || []).find((item) => item.slug === category) || null;
+  const selectedGame = (games || []).find((item) => item.slug === game) || null;
+  const primaryLinks = [
+    { label: "Catalogo completo", href: "/products", active: game === "all" && category === "all" },
+    { label: "Categorias", href: "/categories" },
+    { label: "Juegos", href: "/games" },
+  ];
+  const topCategoryLinks = rootCategories.slice(0, 6).map((item) => ({
+    label: item.name,
+    href: `/categories/${item.slug}`,
+    active: selectedCategory?.slug === item.slug,
+  }));
+  const topGameLinks = (games || []).slice(0, 6).map((item) => ({
+    label: item.name,
+    href: `/games/${item.slug}`,
+    active: selectedGame?.slug === item.slug,
+  }));
 
   return (
     <main>
@@ -247,10 +324,32 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         }}
       />
       <section className="container-shell py-16">
-        <h1 className="text-3xl font-bold text-white">Productos</h1>
-        <p className="mt-3 text-[var(--text-soft)]">
-          Explora los productos aprobados que ya estan disponibles en el marketplace.
-        </p>
+        <DiscoveryNavSpine
+          eyebrow="Marketplace Browse"
+          title="Descubre y compara productos desde una columna vertebral comun"
+          description="Usa el catalogo completo, las categorias y los juegos como rutas estables para explorar oferta real antes de llegar a la ficha del producto."
+          path={[
+            { label: "Productos", href: "/products", active: game === "all" && category === "all" },
+            ...(selectedGame
+              ? [{ label: selectedGame.name, href: `/games/${selectedGame.slug}`, active: true }]
+              : []),
+            ...(selectedCategory
+              ? [{ label: selectedCategory.name, href: `/categories/${selectedCategory.slug}`, active: true }]
+              : []),
+          ]}
+          primaryLinks={primaryLinks}
+          categoryLinks={topCategoryLinks}
+          gameLinks={topGameLinks}
+        />
+
+        <div className="mt-10">
+          <CommerceSectionHeading
+            dataId="catalog-grid"
+            eyebrow="Catalogo publico"
+            title="Productos"
+            description="Explora los productos aprobados que ya estan disponibles en el marketplace y entra en fichas con una lectura comercial mas consistente."
+          />
+        </div>
         {sort === "quality_trust" ? (
           <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
             Orden inteligente activo: mezcla calidad del producto, reputacion del seller y penalizacion por riesgo operativo.
@@ -299,6 +398,23 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                   compatibility={product.compatibility || "Rust"}
                   ratingAverage={product.rating_average}
                   ratingCount={product.rating_count}
+                  qualitySnapshot={buildShoppingQualitySnapshot({
+                    ratingAverage: product.rating_average,
+                    ratingCount: product.rating_count,
+                    supportPolicy: product.support_policy,
+                    refundPolicy: product.refund_policy,
+                    updatePolicy: product.update_policy,
+                    lastUpdatedAt:
+                      snapshotByVendorId.get(product.vendor_id)?.latest_product_update_at ||
+                      product.updated_at,
+                    sellerApprovedProducts:
+                      snapshotByVendorId.get(product.vendor_id)?.approved_products || 0,
+                    sellerTotalPurchases:
+                      snapshotByVendorId.get(product.vendor_id)?.total_purchases || 0,
+                    sellerIdentityVerified: verifiedUserIds.has(
+                      vendorUserIdByVendorId.get(product.vendor_id) || ""
+                    ),
+                  })}
                   href={`/products/${product.slug}`}
                   imageUrl={product.featured_image_url}
                   tracking={{

@@ -6,6 +6,10 @@ function isProtectedRoute(pathname: string) {
     return true;
   }
 
+  if (pathname === "/account" || pathname.startsWith("/account/")) {
+    return true;
+  }
+
   if (pathname === "/feed" || pathname.startsWith("/feed/")) {
     return true;
   }

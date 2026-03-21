@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { CheckoutButton } from "@/components/checkout/checkout-button";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 interface Props {
@@ -16,12 +17,28 @@ interface BundleCheckoutProduct {
 }
 
 interface BundleCheckoutProductRow {
-  product: BundleCheckoutProduct[];
+  product: BundleCheckoutProduct | BundleCheckoutProduct[] | null;
+}
+
+interface BundleCheckoutRow {
+  id: string;
+  title: string;
+  slug: string;
+  short_description: string | null;
+  price_cents: number;
+  is_active: boolean;
+}
+
+function resolveBundleProduct(
+  product: BundleCheckoutProduct | BundleCheckoutProduct[] | null
+): BundleCheckoutProduct | null {
+  return Array.isArray(product) ? (product[0] ?? null) : product;
 }
 
 export default async function BundleCheckoutPage({ params }: Props) {
   const { bundleId } = await params;
   const supabase = await createClient();
+  const adminSupabase = createAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -30,24 +47,25 @@ export default async function BundleCheckoutPage({ params }: Props) {
     redirect("/login");
   }
 
-  const { data: bundle } = await supabase
+  const { data: bundleData } = await adminSupabase
     .from("bundles")
     .select("id, title, slug, short_description, price_cents, is_active")
     .eq("id", bundleId)
     .single();
+  const bundle = bundleData as BundleCheckoutRow | null;
 
   if (!bundle) {
     notFound();
   }
 
-  const { data: bundleProducts } = await supabase
+  const { data: bundleProducts } = await adminSupabase
     .from("bundle_products")
     .select("product:products!inner(id, title, price_cents, moderation_status)")
     .eq("bundle_id", bundle.id);
 
   const includedProducts = ((bundleProducts || []) as BundleCheckoutProductRow[])
-    .map((item) => item.product[0])
-    .filter(Boolean)
+    .map((item) => resolveBundleProduct(item.product))
+    .filter((product): product is BundleCheckoutProduct => Boolean(product))
     .filter((product) => product.moderation_status === "approved");
 
   return (

@@ -5,6 +5,7 @@ import { ProductCard } from "@/components/marketplace/product-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getUserActivityFeed } from "@/lib/community/activity-feed";
+import { getUserEngagementLoopSnapshot } from "@/lib/community/engagement-loop";
 import { getRecommendedBundles, getPersonalizedRecommendations } from "@/lib/intelligence/recommendations";
 import { getPublicDealsForBundles } from "@/lib/promotions/public";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -49,9 +50,10 @@ export default async function ActivityFeedPage() {
   }
 
   const items = await getUserActivityFeed(supabase, adminSupabase, user.id);
-  const [personalizedProducts, recommendedBundles] = await Promise.all([
+  const [personalizedProducts, recommendedBundles, engagementSnapshot] = await Promise.all([
     getPersonalizedRecommendations(user.id, 3),
     getRecommendedBundles(user.id, 3),
+    getUserEngagementLoopSnapshot(supabase, adminSupabase, user.id),
   ]);
   const bundleDeals = await getPublicDealsForBundles(
     recommendedBundles.map((bundle) => ({
@@ -70,6 +72,7 @@ export default async function ActivityFeedPage() {
           activityCount: items.length,
           personalizedProducts: personalizedProducts.length,
           recommendedBundles: recommendedBundles.length,
+          relevantCollections: engagementSnapshot.relevantCollections.length,
         }}
       />
       <section className="container-shell py-16">
@@ -92,6 +95,127 @@ export default async function ActivityFeedPage() {
             </Link>
           </div>
         </div>
+
+        <section className="mt-10 rounded-[2rem] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.025))] p-6 shadow-[0_18px_50px_rgba(2,8,23,0.18)]">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-[var(--text-soft)]">
+                Engagement loop
+              </p>
+              <h2 className="mt-3 text-3xl font-bold text-white">Tu senal de retorno</h2>
+              <p className="mt-3 max-w-3xl text-[var(--text-soft)]">
+                Wishlist, sellers seguidos y colecciones dejan de ser elementos aislados: aqui se convierten en discovery recurrente con contexto comercial real.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge>{engagementSnapshot.wishlistCount} guardados</Badge>
+              <Badge>{engagementSnapshot.followedSellerCount} sellers seguidos</Badge>
+              <Badge>{engagementSnapshot.ownedCollectionCount} colecciones tuyas</Badge>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 lg:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-black/10 p-5">
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-soft)]">Guardar</p>
+              <p className="mt-3 text-sm leading-6 text-[var(--text-soft)]">
+                Tu wishlist alimenta recomendaciones, activa colecciones relacionadas y da una razon clara para volver.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/10 p-5">
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-soft)]">Seguir</p>
+              <p className="mt-3 text-sm leading-6 text-[var(--text-soft)]">
+                Los sellers que sigues convierten cambios y lanzamientos en actividad util dentro del feed.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/10 p-5">
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-soft)]">Curar</p>
+              <p className="mt-3 text-sm leading-6 text-[var(--text-soft)]">
+                Las colecciones te ayudan a guardar intencion de compra y a descubrir combinaciones que luego vuelven como senal relevante.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {engagementSnapshot.relevantCollections.length > 0 ? (
+          <section className="mt-10">
+            <div className="mb-8 flex items-end justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Colecciones para retomar</h2>
+                <p className="mt-2 text-sm text-[var(--text-soft)]">
+                  Curaciones publicas que coinciden con productos que ya guardaste y convierten interes previo en nueva exploracion con contexto.
+                </p>
+              </div>
+              <Link href="/collections" className="text-sm text-white hover:underline">
+                Ver mas colecciones
+              </Link>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+              {engagementSnapshot.relevantCollections.map((collection) => (
+                <article
+                  key={collection.id}
+                  className="rounded-3xl border border-white/10 bg-white/5 p-6"
+                  data-engagement-loop="relevant-collection"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm uppercase tracking-[0.18em] text-[var(--text-soft)]">
+                        Match con tu wishlist
+                      </p>
+                      <h3 className="mt-3 text-2xl font-semibold text-white">{collection.title}</h3>
+                    </div>
+                    <Link
+                      href={`/collections/${collection.slug}`}
+                      className="text-sm font-semibold text-white hover:underline"
+                    >
+                      Abrir
+                    </Link>
+                  </div>
+
+                  <p className="mt-4 text-sm text-[var(--text-soft)]">
+                    {collection.description || "Coleccion publica relevante para volver a explorar el marketplace."}
+                  </p>
+
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <Badge>{collection.matchingWishlistCount} match en wishlist</Badge>
+                    <Badge>Por {collection.ownerName}</Badge>
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {collection.previewProducts.map((product) => (
+                      <Link
+                        key={product.id}
+                        href={`/products/${product.slug}`}
+                        className="rounded-full border border-white/10 px-3 py-1 text-xs text-[var(--text-soft)] transition hover:border-white/20 hover:text-white"
+                      >
+                        {product.title}
+                      </Link>
+                    ))}
+                  </div>
+
+                  <p className="mt-5 text-xs text-[var(--text-soft)]">
+                    Actualizada {new Date(collection.updatedAt).toLocaleDateString("es-ES")}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : (
+          <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 px-6 py-10">
+            <h2 className="text-2xl font-semibold text-white">Activa el loop de retorno</h2>
+            <p className="mt-3 max-w-3xl text-[var(--text-soft)]">
+              Cuando guardes productos o sigas sellers, este feed empezara a devolverte colecciones y actividad realmente conectadas con tu interes.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link href="/products">
+                <Button variant="secondary">Guardar productos</Button>
+              </Link>
+              <Link href="/collections">
+                <Button>Explorar colecciones</Button>
+              </Link>
+            </div>
+          </section>
+        )}
 
         {personalizedProducts.length > 0 ? (
           <section className="mt-10">

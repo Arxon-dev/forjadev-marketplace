@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { MarketplaceTracker } from "@/components/analytics/marketplace-tracker";
 import Image from "next/image";
 import Link from "next/link";
@@ -5,13 +6,20 @@ import { notFound } from "next/navigation";
 import { DownloadButton } from "@/components/downloads/download-button";
 import { ProductCollectionButton } from "@/components/community/product-collection-button";
 import { DiscussionThreadForm } from "@/components/community/discussion-thread-form";
+import { ProductCommerceHelpPanel } from "@/components/help/product-commerce-help-panel";
 import { WishlistButton } from "@/components/community/wishlist-button";
+import { CommerceSectionHeading, CommerceStage } from "@/components/marketplace/commerce-surface-system";
 import { ProductCard } from "@/components/marketplace/product-card";
+import { ShoppingQualitySummary } from "@/components/marketplace/shopping-quality-summary";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { ReviewForm } from "@/components/reviews/review-form";
 import { Badge } from "@/components/ui/badge";
+import { getProductCommerceHelpContext } from "@/lib/help/public";
 import { getSimilarProducts, getUsersAlsoBoughtProducts } from "@/lib/intelligence/recommendations";
+import { buildShoppingQualitySnapshot } from "@/lib/marketplace/quality-signals";
+import { buildDiscussionTrustSnapshot } from "@/lib/community/discussion-trust";
 import { getPublicDealsForProducts } from "@/lib/promotions/public";
+import { buildPublicMetadata } from "@/lib/seo/public-metadata";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicSellerProfile } from "@/lib/sellers/public";
@@ -49,6 +57,7 @@ interface DiscussionRow {
 interface DiscussionMessageRow {
   discussion_id: string;
   author_user_id: string;
+  body: string;
   created_at: string;
 }
 
@@ -73,6 +82,49 @@ interface CollectionItemLookupRow {
   product_id: string;
 }
 
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const supabase = await createClient();
+
+  const { data: product } = await supabase
+    .from("products")
+    .select(
+      "title, slug, short_description, description, moderation_status, category_id, game_id"
+    )
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (!product) {
+    return buildPublicMetadata({
+      title: "Producto no disponible",
+      description: "El producto solicitado no esta disponible en el catalogo publico.",
+      path: `/products/${slug}`,
+      index: false,
+    });
+  }
+
+  const [{ data: category }, { data: game }] = await Promise.all([
+    product.category_id
+      ? supabase.from("categories").select("name").eq("id", product.category_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    product.game_id
+      ? supabase.from("games").select("name").eq("id", product.game_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const contextualDescription =
+    product.short_description ||
+    product.description ||
+    `Explora ${product.title}${game?.name ? ` para ${game.name}` : ""}${category?.name ? ` dentro de ${category.name}` : ""} en ForjaDev Marketplace.`;
+
+  return buildPublicMetadata({
+    title: product.title,
+    description: contextualDescription,
+    path: `/products/${product.slug}`,
+    index: product.moderation_status === "approved",
+  });
+}
+
 export default async function ProductDetailPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const resolvedSearchParams = (await searchParams) || {};
@@ -86,7 +138,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   const { data: product } = await supabase
     .from("products")
     .select(
-      "id, title, slug, short_description, description, support_policy, refund_policy, update_policy, price_cents, is_free, moderation_status, featured_image_url, vendor_id, rejection_reason, compatibility, created_at, category_id, game_id"
+      "id, title, slug, short_description, description, support_policy, refund_policy, update_policy, price_cents, is_free, moderation_status, featured_image_url, vendor_id, rejection_reason, compatibility, created_at, updated_at, category_id, game_id, rating_average, rating_count"
     )
     .eq("slug", slug)
     .single();
@@ -161,6 +213,8 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     .eq("product_id", product.id)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
+
+  const productCommerceHelpContext = await getProductCommerceHelpContext(supabase, product.id, 2, 2);
 
   const { data: discussions } = await supabase
     .from("product_discussions")
@@ -275,7 +329,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     discussionIds.length > 0
       ? supabase
           .from("discussion_messages")
-          .select("discussion_id, author_user_id, created_at")
+          .select("discussion_id, author_user_id, body, created_at")
           .in("discussion_id", discussionIds)
       : Promise.resolve({ data: [] as DiscussionMessageRow[] }),
     discussionAuthorIds.length > 0
@@ -426,6 +480,18 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   const checkoutHref = `/checkout/${product.id}${
     appliedCouponCode ? `?coupon=${encodeURIComponent(appliedCouponCode)}` : ""
   }`;
+  const shoppingQualitySnapshot = buildShoppingQualitySnapshot({
+    ratingAverage: averageRating ?? product.rating_average,
+    ratingCount: reviews?.length || product.rating_count || 0,
+    supportPolicy: product.support_policy,
+    refundPolicy: product.refund_policy,
+    updatePolicy: product.update_policy,
+    lastUpdatedAt:
+      latestVersion?.created_at || sellerProfile?.metrics.latestProductUpdateAt || product.updated_at,
+    sellerApprovedProducts: sellerProfile?.metrics.approvedProducts || 0,
+    sellerTotalPurchases: sellerProfile?.metrics.totalPurchases || 0,
+    sellerIdentityVerified: sellerProfile?.identityVerification.isVerified || false,
+  });
 
   return (
     <main>
@@ -442,60 +508,69 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
         }}
       />
       <section className="container-shell py-16">
-        <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--text-soft)]">
-          <Link href="/products" className="hover:text-white">
-            Productos
-          </Link>
-          {game ? (
-            <>
-              <span>/</span>
-              <Link href={`/games/${game.slug}`} className="hover:text-white">
-                {game.name}
+        <CommerceStage
+          dataId="product-stage"
+          eyebrow="Producto"
+          title={product.title}
+          description={
+            product.short_description ||
+            "Ficha comercial preparada para evaluar valor, confianza, soporte y decision de compra."
+          }
+          surface="context"
+          path={
+            <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--text-soft)]">
+              <Link href="/products" className="hover:text-white">
+                Productos
               </Link>
-            </>
-          ) : null}
-          {parentCategory ? (
-            <>
+              {game ? (
+                <>
+                  <span>/</span>
+                  <Link href={`/games/${game.slug}`} className="hover:text-white">
+                    {game.name}
+                  </Link>
+                </>
+              ) : null}
+              {parentCategory ? (
+                <>
+                  <span>/</span>
+                  <Link href={`/categories/${parentCategory.slug}`} className="hover:text-white">
+                    {parentCategory.name}
+                  </Link>
+                </>
+              ) : null}
+              {category ? (
+                <>
+                  <span>/</span>
+                  <Link href={`/categories/${category.slug}`} className="hover:text-white">
+                    {category.name}
+                  </Link>
+                </>
+              ) : null}
               <span>/</span>
-              <Link href={`/categories/${parentCategory.slug}`} className="hover:text-white">
-                {parentCategory.name}
-              </Link>
-            </>
-          ) : null}
-          {category ? (
-            <>
-              <span>/</span>
-              <Link href={`/categories/${category.slug}`} className="hover:text-white">
-                {category.name}
-              </Link>
-            </>
-          ) : null}
-          <span>/</span>
-          <span className="text-white">{product.title}</span>
-        </div>
+              <span className="text-white">{product.title}</span>
+            </div>
+          }
+          stats={[
+            { label: "Seller", value: vendor?.store_name || "Tienda" },
+            { label: "Compatibilidad", value: product.compatibility || "Rust" },
+            { label: "Version actual", value: latestVersion?.version || "Sin version" },
+            {
+              label: "Valoracion",
+              value: averageRating ? `${averageRating.toFixed(1)}/5` : "Sin valoraciones",
+            },
+          ]}
+        />
 
         <div className="mt-8 grid gap-10 lg:grid-cols-[1.2fr_0.8fr]">
           <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-[var(--text-soft)]">
-              Producto
-            </p>
-            <h1 className="mt-3 text-4xl font-bold text-white">{product.title}</h1>
-            <p className="mt-3 text-sm text-[var(--text-soft)]">
-              Por {vendor?.store_name || "Tienda"} | Estado: {product.moderation_status}
-            </p>
-
             {product.featured_image_url ? (
               <Image
                 src={product.featured_image_url}
                 alt={product.title}
                 width={1400}
                 height={700}
-                className="mt-8 h-72 w-full rounded-3xl object-cover"
+                className="h-72 w-full rounded-3xl object-cover"
               />
-            ) : null}
-
-            {product.short_description ? (
-              <p className="mt-8 text-lg text-white/85">{product.short_description}</p>
             ) : null}
 
             {(isOwner || isAdmin) && product.rejection_reason ? (
@@ -505,7 +580,12 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
             ) : null}
 
             <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
-              <h2 className="text-xl font-semibold text-white">Descripcion</h2>
+              <CommerceSectionHeading
+                dataId="product-description"
+                eyebrow="Producto"
+                title="Descripcion"
+                description="Lee la propuesta de valor y el alcance funcional antes de decidir la compra."
+              />
               <p className="mt-4 whitespace-pre-wrap text-[var(--text-soft)]">
                 {product.description || "Este producto no tiene descripcion detallada todavia."}
               </p>
@@ -608,6 +688,10 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                   </Link>
                 </div>
               </div>
+            ) : null}
+
+            {productCommerceHelpContext ? (
+              <ProductCommerceHelpPanel context={productCommerceHelpContext} />
             ) : null}
 
             {faqs && faqs.length > 0 ? (
@@ -753,9 +837,9 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <h2 className="text-xl font-semibold text-white">Detalles</h2>
-              <div className="mt-4 space-y-3 text-sm text-[var(--text-soft)]">
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+                <h2 className="text-xl font-semibold text-white">Detalles</h2>
+                <div className="mt-4 space-y-3 text-sm text-[var(--text-soft)]">
                 <p>
                   Juego: <span className="text-white">{game?.name || "Rust"}</span>
                 </p>
@@ -798,11 +882,15 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                       {activeDeal.promoLabel}
                     </span>
                   </p>
-                ) : null}
+                  ) : null}
+                </div>
               </div>
-            </div>
 
-            {sellerProfile ? (
+              {shoppingQualitySnapshot ? (
+                <ShoppingQualitySummary snapshot={shoppingQualitySnapshot} variant="detail" />
+              ) : null}
+
+              {sellerProfile ? (
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -992,7 +1080,12 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                 <div className="mt-5 space-y-4">
                   {discussionRows.map((discussion) => {
                     const author = discussionProfileById.get(discussion.author_user_id);
-                    const replyCount = discussionMessagesById.get(discussion.id)?.length || 0;
+                    const threadMessages = discussionMessagesById.get(discussion.id) || [];
+                    const trustSnapshot = buildDiscussionTrustSnapshot({
+                      discussion,
+                      messages: threadMessages,
+                      sellerUserId: vendor?.user_id || null,
+                    });
 
                     return (
                       <article key={discussion.id} className="rounded-2xl border border-white/10 p-4">
@@ -1001,6 +1094,11 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                             <div className="flex flex-wrap gap-2">
                               {discussion.is_pinned ? <Badge>Fijada</Badge> : null}
                               {discussion.is_locked ? <Badge>Bloqueada</Badge> : null}
+                              {trustSnapshot.hasSellerResponse ? (
+                                <Badge>Respondida por seller</Badge>
+                              ) : (
+                                <Badge>Pendiente del seller</Badge>
+                              )}
                             </div>
                             <h4 className="mt-3 text-lg font-semibold text-white">
                               {discussion.title}
@@ -1008,6 +1106,25 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                             <p className="mt-2 line-clamp-3 text-sm text-[var(--text-soft)]">
                               {discussion.body}
                             </p>
+                            <div className="mt-4 rounded-2xl border border-white/10 bg-black/10 p-4">
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+                                Estado del hilo
+                              </p>
+                              <p className="mt-2 text-sm font-semibold text-white">
+                                {trustSnapshot.statusLabel}
+                              </p>
+                              <p className="mt-2 text-sm text-[var(--text-soft)]">
+                                {trustSnapshot.nextAction}
+                              </p>
+                              {trustSnapshot.latestSellerReplyPreview ? (
+                                <p className="mt-3 text-sm text-[var(--text-soft)]">
+                                  Ultima respuesta del creador:{" "}
+                                  <span className="text-white">
+                                    {trustSnapshot.latestSellerReplyPreview}
+                                  </span>
+                                </p>
+                              ) : null}
+                            </div>
                           </div>
                           <Link
                             href={`/products/${product.slug}/discussions/${discussion.id}`}
@@ -1025,9 +1142,10 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                               author?.email ||
                               "Usuario"}
                           </span>
-                          <span>{replyCount} respuestas</span>
+                          <span>{trustSnapshot.totalReplies} respuestas</span>
+                          <span>{trustSnapshot.sellerReplyCount} del creador</span>
                           <span>
-                            Actualizada {new Date(discussion.updated_at).toLocaleString("es-ES")}
+                            Actualizada {new Date(trustSnapshot.latestReplyAt).toLocaleString("es-ES")}
                           </span>
                         </div>
                       </article>

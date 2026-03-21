@@ -58,6 +58,24 @@ La gestion avanzada de producto seller ya no depende solo del formulario general
   - vigencia y estado comercial
   - impacto reciente basico del producto
   - continuidad con el workspace seller
+- Continuidad postventa por producto dentro del workspace seller
+- Lectura compacta de:
+  - tickets esperando seller
+  - disputas activas ligadas al producto
+  - refunds emitidos
+  - licencias revocadas
+  - senales abiertas de riesgo postventa
+- Capa compartida de inteligencia por producto para seller/admin
+- Lectura accionable de:
+  - traccion comercial reciente
+  - conversion
+  - ingresos
+  - friccion operativa y riesgo
+  - siguiente accion sugerida
+- Mismo panel visible desde:
+  - `/seller/products/[id]`
+  - `/seller/products/[id]/support`
+- La vista seller muestra senales operativas y no evidencia privada del buyer
 - Resumen de revision y rendimiento de 30 dias
 
 ## Pendiente para una fase posterior

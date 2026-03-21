@@ -6,6 +6,13 @@ import { RiskSeverityPill } from "@/components/admin/risk-severity-pill";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { Button } from "@/components/ui/button";
 import { requireAdminContext } from "@/lib/auth/admin";
+import {
+  disputeNextActionLabel,
+  formatProfileLabel,
+  getDisputeCaseDetail,
+} from "@/lib/disputes/detail";
+import { buildAdminDisputeTriageSnapshot } from "@/lib/risk/admin-dispute-triage";
+import { getPostSaleGuardrailSnapshot } from "@/lib/risk/post-sale-guardrails";
 
 type RiskEventRow = {
   id: string;
@@ -181,6 +188,39 @@ export default async function AdminRiskPage() {
   const highRiskCount = riskEvents.filter((event) => event.severity === "high").length;
   const activeModerationFlagCount = moderationFlags.length;
   const openDisputeCount = disputes.filter((dispute) => ["open", "reviewing"].includes(dispute.status)).length;
+  const activeDisputes = disputes.filter((dispute) => dispute.status === "open" || dispute.status === "reviewing");
+  const triageEntries = await Promise.all(
+    activeDisputes.map(async (dispute) => {
+      const detail = await getDisputeCaseDetail(supabase, dispute.id);
+      const guardrails = await getPostSaleGuardrailSnapshot(supabase, {
+        buyerUserId: dispute.opened_by_user_id,
+        productId: dispute.product_id,
+        orderId: dispute.order_id,
+        licenseId: dispute.license_id,
+        disputeId: dispute.id,
+      });
+      const triage = buildAdminDisputeTriageSnapshot({
+        disputeStatus: dispute.status,
+        guardrailSeverity: guardrails.overallSeverity,
+        latestSupportStatus: detail?.latestSupportTicket?.status || null,
+        updatedAt: dispute.updated_at,
+      });
+
+      return {
+        dispute,
+        detail,
+        guardrails,
+        triage,
+      };
+    })
+  );
+  triageEntries.sort((left, right) => {
+    if (right.triage.score !== left.triage.score) {
+      return right.triage.score - left.triage.score;
+    }
+
+    return new Date(left.dispute.updated_at).getTime() - new Date(right.dispute.updated_at).getTime();
+  });
 
   return (
     <main>
@@ -216,6 +256,87 @@ export default async function AdminRiskPage() {
             <p className="text-sm text-[var(--text-soft)]">Disputas abiertas</p>
             <p className="mt-2 text-3xl font-bold text-white">{openDisputeCount}</p>
           </div>
+        </div>
+
+        <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-white">Triage operativo de disputas</h2>
+              <p className="mt-2 max-w-3xl text-sm text-[var(--text-soft)]">
+                Esta cola ordena primero los casos que ya piden decision administrativa clara, mas contexto de riesgo o menos margen para esperar.
+              </p>
+            </div>
+          </div>
+
+          {triageEntries.length > 0 ? (
+            <div className="mt-5 space-y-4">
+              {triageEntries.map(({ dispute, detail, guardrails, triage }) => {
+                const product =
+                  detail?.product ||
+                  (dispute.product_id ? productById.get(dispute.product_id) || null : null);
+                const buyer =
+                  detail?.buyerProfile || profileById.get(dispute.opened_by_user_id) || null;
+
+                return (
+                  <article
+                    key={dispute.id}
+                    data-admin-triage-level={triage.priority}
+                    className="rounded-2xl border border-white/10 bg-black/10 p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${triage.tone}`}>
+                            {triage.label}
+                          </span>
+                          <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-white">
+                            {dispute.status}
+                          </span>
+                          {product ? (
+                            <span className="text-xs text-[var(--text-soft)]">{product.title}</span>
+                          ) : null}
+                        </div>
+                        <p className="mt-3 text-sm font-semibold text-white">
+                          {formatProfileLabel(buyer, dispute.opened_by_user_id)}
+                        </p>
+                        <p className="mt-2 text-sm text-[var(--text-soft)]">{triage.reason}</p>
+                        <p className="mt-2 text-sm text-[var(--text-soft)]">
+                          Siguiente accion:{" "}
+                          <span className="text-white">{disputeNextActionLabel(dispute.status, "admin")}</span>
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-4 text-xs text-[var(--text-soft)]">
+                          <span>Refunds previos: {guardrails.refundedOrdersCount}</span>
+                          <span>Disputas activas: {guardrails.openDisputeCount}</span>
+                          <span>Licencias revocadas: {guardrails.revokedLicenseCount}</span>
+                          <span>Eventos/anomalias: {guardrails.openRiskEventCount + guardrails.anomalyCount}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex min-w-[220px] flex-wrap gap-3">
+                        <Link href={`/admin/disputes/${dispute.id}`}>
+                          <Button variant="secondary">Abrir caso</Button>
+                        </Link>
+                        {detail?.latestSupportTicket ? (
+                          <Link href={`/support/tickets/${detail.latestSupportTicket.id}`}>
+                            <Button variant="ghost">Ver ticket</Button>
+                          </Link>
+                        ) : null}
+                        {product ? (
+                          <Link href={`/admin/products/${product.id}`}>
+                            <Button variant="ghost">Ver producto</Button>
+                          </Link>
+                        ) : null}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="mt-5 rounded-2xl border border-white/10 bg-black/10 px-6 py-10 text-center">
+              <p className="text-[var(--text-soft)]">No hay disputas activas que requieran triage ahora mismo.</p>
+            </div>
+          )}
         </div>
 
         <div className="mt-10 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
@@ -313,6 +434,16 @@ export default async function AdminRiskPage() {
                         </div>
                         <div className="mt-4">
                           <DisputeActions disputeId={dispute.id} currentStatus={dispute.status} />
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-3">
+                          <Link href={`/admin/disputes/${dispute.id}`}>
+                            <Button variant="secondary">Abrir caso</Button>
+                          </Link>
+                          {product ? (
+                            <Link href={`/admin/products/${product.id}`}>
+                              <Button variant="ghost">Ver producto</Button>
+                            </Link>
+                          ) : null}
                         </div>
                       </article>
                     );

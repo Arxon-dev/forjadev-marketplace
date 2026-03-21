@@ -46,6 +46,11 @@ export type PolicyDetail = PolicyListItem & {
   body: string;
 };
 
+export interface ProductCommerceHelpContext {
+  articles: HelpArticleListItem[];
+  policies: PolicyListItem[];
+}
+
 function normalizeArticleItems(rawItems: any[]): HelpArticleListItem[] {
   return rawItems.map((item) => {
     const category = Array.isArray(item.category) ? item.category[0] : item.category;
@@ -208,4 +213,66 @@ export async function getPublicPolicyByKey(
     .maybeSingle();
 
   return (data as PolicyDetail | null) || null;
+}
+
+export async function getProductCommerceHelpContext(
+  supabase: SupabaseClientLike,
+  productId: string,
+  articleLimit = 2,
+  policyLimit = 2
+): Promise<ProductCommerceHelpContext | null> {
+  const [relatedArticlesResult, featuredArticlesResult, policiesResult] = await Promise.all([
+    supabase
+      .from("help_center_articles")
+      .select(
+        "id, slug, title, summary, article_type, audience, published_at, updated_at, sort_order, category:help_center_categories(id, slug, title, description, icon, sort_order), relatedProduct:products(id, title, slug)"
+      )
+      .eq("status", "published")
+      .eq("related_product_id", productId)
+      .in("audience", ["buyer", "shared"])
+      .order("sort_order", { ascending: true })
+      .order("published_at", { ascending: false })
+      .limit(articleLimit),
+    supabase
+      .from("help_center_articles")
+      .select(
+        "id, slug, title, summary, article_type, audience, published_at, updated_at, sort_order, category:help_center_categories(id, slug, title, description, icon, sort_order), relatedProduct:products(id, title, slug)"
+      )
+      .eq("status", "published")
+      .eq("is_featured", true)
+      .in("audience", ["buyer", "shared"])
+      .order("sort_order", { ascending: true })
+      .order("published_at", { ascending: false })
+      .limit(Math.max(articleLimit, 4)),
+    supabase
+      .from("marketplace_policy_pages")
+      .select("id, policy_key, title, summary, audience, published_at, updated_at, sort_order")
+      .eq("status", "published")
+      .in("audience", ["buyer", "shared"])
+      .order("sort_order", { ascending: true })
+      .order("published_at", { ascending: false })
+      .limit(policyLimit),
+  ]);
+
+  const directArticles = normalizeArticleItems(relatedArticlesResult.data || []);
+  const featuredArticles = normalizeArticleItems(featuredArticlesResult.data || []);
+  const articleById = new Map<string, HelpArticleListItem>();
+
+  for (const article of [...directArticles, ...featuredArticles]) {
+    if (!articleById.has(article.id)) {
+      articleById.set(article.id, article);
+    }
+  }
+
+  const articles = Array.from(articleById.values()).slice(0, articleLimit);
+  const policies = (policiesResult.data || []) as PolicyListItem[];
+
+  if (articles.length === 0 && policies.length === 0) {
+    return null;
+  }
+
+  return {
+    articles,
+    policies,
+  };
 }

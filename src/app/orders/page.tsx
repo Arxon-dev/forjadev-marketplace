@@ -3,9 +3,11 @@ import { redirect } from "next/navigation";
 import { DisputeForm } from "@/components/community/dispute-form";
 import { DownloadButton } from "@/components/downloads/download-button";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
+import { BuyerPostSaleClarityCard } from "@/components/post-sale/buyer-post-sale-clarity-card";
 import { Badge } from "@/components/ui/badge";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveDownloadAccess } from "@/lib/downloads/access";
+import { buildBuyerPostSaleTransparencySnapshot } from "@/lib/post-sale/buyer-transparency";
 import { createClient } from "@/lib/supabase/server";
 
 type LicenseStatus = "active" | "revoked";
@@ -15,6 +17,7 @@ interface ProductRow {
   title: string;
   slug: string;
   is_free?: boolean;
+  refund_policy?: string | null;
 }
 
 interface LicenseRow {
@@ -125,7 +128,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   const { data: orders } = await supabase
     .from("orders")
     .select(
-      "id, created_at, status, total_cents, items:order_items(id, price_cents, product:products(id, title, slug, is_free), license:licenses(id, license_key, status, issued_at))"
+      "id, created_at, status, total_cents, items:order_items(id, price_cents, product:products(id, title, slug, is_free, refund_policy), license:licenses(id, license_key, status, issued_at))"
     )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
@@ -283,6 +286,11 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                           Nuevo
                         </Badge>
                       ) : null}
+                      {order.status === "refunded" ? (
+                        <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+                          Pedido reembolsado
+                        </Badge>
+                      ) : null}
                     </div>
                     <p className="mt-1 text-sm text-[var(--text-soft)]">
                       {new Date(order.created_at).toLocaleString("es-ES")} ·{" "}
@@ -311,6 +319,20 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                     const supportTickets = product?.id ? supportByProductId.get(product.id) || [] : [];
                     const disputes = product?.id ? disputesByProductId.get(product.id) || [] : [];
                     const openDisputes = disputes.filter((dispute) => dispute.status !== "closed").length;
+                    const transparencySnapshot = buildBuyerPostSaleTransparencySnapshot({
+                      orderStatus: order.status,
+                      accessOk: access.ok,
+                      accessMessage: access.ok ? null : access.message,
+                      licenseStatus: license?.status || null,
+                      hasDownload: Boolean(lastDownload),
+                      supportStatuses: supportTickets.map((ticket) => ticket.status),
+                      disputeStatuses: disputes
+                        .map((dispute) => dispute.status)
+                        .filter((status): status is "open" | "reviewing" | "resolved" | "rejected" =>
+                          ["open", "reviewing", "resolved", "rejected"].includes(status)
+                        ),
+                      productRefundPolicy: product?.refund_policy || null,
+                    });
 
                     return (
                       <div key={item.id} className="rounded-2xl border border-white/10 bg-black/10 p-5">
@@ -378,6 +400,10 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                                 </p>
                               )}
                             </div>
+
+                            <div className="mt-4">
+                              <BuyerPostSaleClarityCard snapshot={transparencySnapshot} />
+                            </div>
                           </div>
 
                           <div className="min-w-[240px] space-y-3">
@@ -407,6 +433,11 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                               <Link href="/licenses">
                                 <Badge className="cursor-pointer border-white/10 bg-white/5 text-[var(--text-soft)] hover:text-white">
                                   Ver licencias
+                                </Badge>
+                              </Link>
+                              <Link href="/policies/reembolsos-y-reclamaciones">
+                                <Badge className="cursor-pointer border-white/10 bg-white/5 text-[var(--text-soft)] hover:text-white">
+                                  Policy de reembolsos
                                 </Badge>
                               </Link>
                             </div>

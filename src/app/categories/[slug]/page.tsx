@@ -1,10 +1,16 @@
+import type { Metadata } from "next";
 import { MarketplaceTracker } from "@/components/analytics/marketplace-tracker";
+import { DiscoveryNavSpine } from "@/components/discovery/discovery-nav-spine";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
+import { CommerceSectionHeading, CommerceStage } from "@/components/marketplace/commerce-surface-system";
 import { ProductCard } from "@/components/marketplace/product-card";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { buildShoppingQualitySnapshot } from "@/lib/marketplace/quality-signals";
+import { buildPublicMetadata } from "@/lib/seo/public-metadata";
 import { createClient } from "@/lib/supabase/server";
 
 interface CategoryPageProps {
@@ -13,9 +19,40 @@ interface CategoryPageProps {
   }>;
 }
 
+export async function generateMetadata({
+  params,
+}: CategoryPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const supabase = await createClient();
+  const { data: category } = await supabase
+    .from("categories")
+    .select("name, slug, description, parent_id")
+    .eq("slug", slug)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!category) {
+    return buildPublicMetadata({
+      title: "Categoria no disponible",
+      description: "La categoria solicitada no esta disponible o ya no forma parte del catalogo publico.",
+      path: `/categories/${slug}`,
+      index: false,
+    });
+  }
+
+  return buildPublicMetadata({
+    title: `${category.name} en el marketplace`,
+    description:
+      category.description ||
+      `Explora productos de ${category.name} dentro de ForjaDev y compara recursos con la misma intencion comercial.`,
+    path: `/categories/${category.slug}`,
+  });
+}
+
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = await params;
   const supabase = await createClient();
+  const adminSupabase = createAdminClient();
 
   const { data: category } = await supabase
     .from("categories")
@@ -28,7 +65,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     notFound();
   }
 
-  const [{ data: childCategories }, { data: allCategories }] = await Promise.all([
+  const [{ data: childCategories }, { data: allCategories }, { data: games }] = await Promise.all([
     supabase
       .from("categories")
       .select("id, name, slug, description")
@@ -40,6 +77,12 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       .from("categories")
       .select("id, name, slug, parent_id")
       .eq("is_active", true),
+    supabase
+      .from("games")
+      .select("id, name, slug, sort_order")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true }),
   ]);
 
   const relatedCategoryIds = [
@@ -59,7 +102,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
         ? await supabase
           .from("products")
           .select(
-            "id, vendor_id, category_id, title, slug, price_cents, is_free, compatibility, featured_image_url, rating_average, rating_count"
+            "id, vendor_id, category_id, title, slug, price_cents, is_free, compatibility, featured_image_url, rating_average, rating_count, updated_at, support_policy, refund_policy, update_policy"
           )
           .eq("moderation_status", "approved")
           .in("id", productIds)
@@ -75,16 +118,41 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
   const [vendorsResult, categoriesResult] = await Promise.all([
     vendorIds.length > 0
-      ? supabase.from("vendors").select("id, store_name").in("id", vendorIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; store_name: string }> }),
+      ? supabase.from("vendors").select("id, user_id, store_name").in("id", vendorIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; user_id: string; store_name: string }> }),
     categoryIds.length > 0
       ? supabase.from("categories").select("id, name").in("id", categoryIds)
       : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
   ]);
+  const vendorRows = vendorsResult.data || [];
+  const vendorUserIds = Array.from(new Set(vendorRows.map((vendor) => vendor.user_id).filter(Boolean)));
+  const [sellerSnapshotsResult, identitiesResult] = await Promise.all([
+    vendorIds.length > 0
+      ? adminSupabase
+          .from("seller_reputation_snapshots")
+          .select("vendor_id, approved_products, total_purchases, latest_product_update_at")
+          .in("vendor_id", vendorIds)
+      : Promise.resolve({
+          data: [] as Array<{
+            vendor_id: string;
+            approved_products: number;
+            total_purchases: number;
+            latest_product_update_at: string | null;
+          }>,
+        }),
+    vendorUserIds.length > 0
+      ? adminSupabase.from("user_provider_identities").select("user_id").in("user_id", vendorUserIds)
+      : Promise.resolve({ data: [] as Array<{ user_id: string }> }),
+  ]);
 
   const vendorById = new Map(
-    (vendorsResult.data || []).map((vendor) => [vendor.id, vendor.store_name])
+    vendorRows.map((vendor) => [vendor.id, vendor.store_name])
   );
+  const vendorUserIdByVendorId = new Map(vendorRows.map((vendor) => [vendor.id, vendor.user_id]));
+  const snapshotByVendorId = new Map(
+    (sellerSnapshotsResult.data || []).map((snapshot) => [snapshot.vendor_id, snapshot])
+  );
+  const verifiedUserIds = new Set((identitiesResult.data || []).map((identity) => identity.user_id));
   const categoryById = new Map(
     (categoriesResult.data || []).map((item) => [item.id, item.name])
   );
@@ -92,6 +160,26 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     category.parent_id !== null
       ? (allCategories || []).find((item) => item.id === category.parent_id) || null
       : null;
+  const siblingCategories =
+    parentCategory !== null
+      ? (allCategories || [])
+          .filter((item) => item.parent_id === parentCategory.id)
+          .slice(0, 6)
+      : (allCategories || []).filter((item) => item.parent_id === null).slice(0, 6);
+  const primaryLinks = [
+    { label: "Catalogo completo", href: "/products" },
+    { label: "Categorias", href: "/categories" },
+    { label: "Juegos", href: "/games" },
+  ];
+  const categoryLinks = siblingCategories.map((item) => ({
+    label: item.name,
+    href: `/categories/${item.slug}`,
+    active: item.slug === category.slug,
+  }));
+  const gameLinks = (games || []).slice(0, 6).map((item) => ({
+    label: item.name,
+    href: `/games/${item.slug}`,
+  }));
 
   return (
     <main>
@@ -107,49 +195,68 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
         }}
       />
       <section className="container-shell py-16">
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
-          <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--text-soft)]">
-            <Link href="/products" className="hover:text-white">
-              Productos
-            </Link>
-            {parentCategory ? (
-              <>
-                <span>/</span>
-                <Link href={`/categories/${parentCategory.slug}`} className="hover:text-white">
-                  {parentCategory.name}
-                </Link>
-              </>
-            ) : null}
-            <span>/</span>
-            <span className="text-white">{category.name}</span>
-          </div>
+        <DiscoveryNavSpine
+          eyebrow="Marketplace Browse"
+          title={`Explora ${category.name} dentro del marketplace`}
+          description="Mantente dentro de una ruta comercial estable: vuelve al catalogo general, cambia de categoria o entra por juego sin perder el contexto de browsing."
+          path={[
+            { label: "Productos", href: "/products" },
+            { label: "Categorias", href: "/categories" },
+            ...(parentCategory
+              ? [{ label: parentCategory.name, href: `/categories/${parentCategory.slug}` }]
+              : []),
+            { label: category.name, href: `/categories/${category.slug}`, active: true },
+          ]}
+          primaryLinks={primaryLinks}
+          categoryLinks={categoryLinks}
+          gameLinks={gameLinks}
+        />
 
-          <div className="mt-6 max-w-3xl">
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-[var(--primary)]">
-              Categoria
-            </p>
-            <h1 className="mt-3 text-4xl font-bold text-white md:text-5xl">{category.name}</h1>
-            <p className="mt-4 text-base text-[var(--text-soft)] md:text-lg">
-              {category.description ||
-                "Descubre productos curados dentro de esta categoria del marketplace."}
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Badge>{products?.length || 0} productos</Badge>
-              {childCategories && childCategories.length > 0 ? (
-                <Badge>{childCategories.length} subcategorias</Badge>
-              ) : null}
-            </div>
-          </div>
+        <div className="mt-10">
+          <CommerceStage
+            dataId="category-stage"
+            eyebrow="Categoria"
+            title={category.name}
+            description={
+              category.description ||
+              "Descubre productos curados dentro de esta categoria del marketplace."
+            }
+            surface="context"
+            path={
+              <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--text-soft)]">
+                <Link href="/products" className="hover:text-white">
+                  Productos
+                </Link>
+                {parentCategory ? (
+                  <>
+                    <span>/</span>
+                    <Link href={`/categories/${parentCategory.slug}`} className="hover:text-white">
+                      {parentCategory.name}
+                    </Link>
+                  </>
+                ) : null}
+                <span>/</span>
+                <span className="text-white">{category.name}</span>
+              </div>
+            }
+            stats={[
+              { label: "Productos", value: String(products?.length || 0) },
+              {
+                label: "Subcategorias",
+                value: String(childCategories && childCategories.length > 0 ? childCategories.length : 0),
+              },
+            ]}
+          />
         </div>
 
         {childCategories && childCategories.length > 0 ? (
           <section className="mt-12">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-white">Subcategorias</h2>
-              <p className="mt-2 text-sm text-[var(--text-soft)]">
-                Refina tu navegacion desde las areas mas especificas de esta categoria.
-              </p>
-            </div>
+            <CommerceSectionHeading
+              dataId="category-children"
+              eyebrow="Refinamiento comercial"
+              title="Subcategorias"
+              description="Refina tu navegacion desde las areas mas especificas de esta categoria."
+            />
 
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
               {childCategories.map((item) => (
@@ -172,12 +279,12 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
         ) : null}
 
         <section className="mt-12">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-white">Productos en {category.name}</h2>
-            <p className="mt-2 text-sm text-[var(--text-soft)]">
-              Seleccion preparados para discovery rapido dentro de esta vertical.
-            </p>
-          </div>
+            <CommerceSectionHeading
+              dataId="category-products"
+              eyebrow="Shopping journey"
+              title={`Productos en ${category.name}`}
+              description="Seleccion preparados para discovery rapido dentro de esta vertical."
+            />
 
           {products && products.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -191,6 +298,23 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                   compatibility={product.compatibility || "Rust"}
                   ratingAverage={product.rating_average}
                   ratingCount={product.rating_count}
+                  qualitySnapshot={buildShoppingQualitySnapshot({
+                    ratingAverage: product.rating_average,
+                    ratingCount: product.rating_count,
+                    supportPolicy: product.support_policy,
+                    refundPolicy: product.refund_policy,
+                    updatePolicy: product.update_policy,
+                    lastUpdatedAt:
+                      snapshotByVendorId.get(product.vendor_id)?.latest_product_update_at ||
+                      product.updated_at,
+                    sellerApprovedProducts:
+                      snapshotByVendorId.get(product.vendor_id)?.approved_products || 0,
+                    sellerTotalPurchases:
+                      snapshotByVendorId.get(product.vendor_id)?.total_purchases || 0,
+                    sellerIdentityVerified: verifiedUserIds.has(
+                      vendorUserIdByVendorId.get(product.vendor_id) || ""
+                    ),
+                  })}
                   href={`/products/${product.slug}`}
                   imageUrl={product.featured_image_url}
                   tracking={{

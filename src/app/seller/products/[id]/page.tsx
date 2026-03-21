@@ -1,6 +1,10 @@
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
+import { ProductHealthPanel } from "@/components/intelligence/product-health-panel";
+import { SellerProductPostSalePanel } from "@/components/seller/seller-product-post-sale-panel";
 import { SellerProductWorkspace } from "@/components/seller/seller-product-workspace";
 import { requireOwnedProductContext } from "@/lib/auth/seller";
+import { getProductHealthSnapshot } from "@/lib/intelligence/product-health";
+import { getSellerProductPostSaleSnapshot } from "@/lib/seller/post-sale-visibility";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -14,7 +18,11 @@ export default async function SellerProductWorkspacePage({
   params,
 }: SellerProductWorkspacePageProps) {
   const { id } = await params;
-  const { product } = await requireOwnedProductContext(id);
+  const { product, vendor } = await requireOwnedProductContext(id);
+  const [postSaleSnapshot, productHealthSnapshot] = await Promise.all([
+    getSellerProductPostSaleSnapshot(product.id, vendor.id),
+    getProductHealthSnapshot(product.id, vendor.id),
+  ]);
 
   return (
     <main>
@@ -40,6 +48,12 @@ export default async function SellerProductWorkspacePage({
               </Link>
             </div>
           </div>
+        </div>
+        <div className="mb-8">
+          <SellerProductPostSalePanel productId={id} snapshot={postSaleSnapshot} />
+        </div>
+        <div className="mb-8">
+          <ProductHealthPanel snapshot={productHealthSnapshot} audience="seller" />
         </div>
         <SellerProductWorkspace productId={id} />
       </section>

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { DiscussionReplyForm } from "@/components/community/discussion-reply-form";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { Badge } from "@/components/ui/badge";
+import { buildDiscussionTrustSnapshot } from "@/lib/community/discussion-trust";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,7 +31,7 @@ export default async function ProductDiscussionDetailPage({ params }: Props) {
 
   const { data: product } = await supabase
     .from("products")
-    .select("id, title, slug, moderation_status")
+    .select("id, title, slug, moderation_status, vendor_id")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -56,6 +57,12 @@ export default async function ProductDiscussionDetailPage({ params }: Props) {
     notFound();
   }
 
+  const { data: vendor } = await supabase
+    .from("vendors")
+    .select("user_id")
+    .eq("id", product.vendor_id)
+    .maybeSingle();
+
   const authorIds = Array.from(
     new Set([discussion.author_user_id, ...(messages || []).map((message) => message.author_user_id)])
   );
@@ -70,6 +77,11 @@ export default async function ProductDiscussionDetailPage({ params }: Props) {
   const profileById = new Map(((profiles || []) as ProfileRow[]).map((profile) => [profile.id, profile]));
   const discussionAuthor = profileById.get(discussion.author_user_id);
   const canReply = Boolean(user);
+  const trustSnapshot = buildDiscussionTrustSnapshot({
+    discussion,
+    messages: messages || [],
+    sellerUserId: vendor?.user_id || null,
+  });
 
   return (
     <main>
@@ -93,6 +105,11 @@ export default async function ProductDiscussionDetailPage({ params }: Props) {
               <div className="flex flex-wrap gap-2">
                 {discussion.is_pinned ? <Badge>Fijada</Badge> : null}
                 {discussion.is_locked ? <Badge>Bloqueada</Badge> : null}
+                {trustSnapshot.hasSellerResponse ? (
+                  <Badge>Respondida por seller</Badge>
+                ) : (
+                  <Badge>Pendiente del seller</Badge>
+                )}
               </div>
               <h1 className="mt-4 text-3xl font-bold text-white">{discussion.title}</h1>
               <p className="mt-3 text-sm text-[var(--text-soft)]">
@@ -116,6 +133,34 @@ export default async function ProductDiscussionDetailPage({ params }: Props) {
           <div className="mt-6 rounded-2xl border border-white/10 bg-black/10 p-5">
             <p className="whitespace-pre-wrap text-[var(--text-soft)]">{discussion.body}</p>
           </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-soft)]">Estado</p>
+              <p className="mt-2 text-lg font-semibold text-white">{trustSnapshot.statusLabel}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-soft)]">Respuestas</p>
+              <p className="mt-2 text-lg font-semibold text-white">{trustSnapshot.totalReplies}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-soft)]">Del creador</p>
+              <p className="mt-2 text-lg font-semibold text-white">{trustSnapshot.sellerReplyCount}</p>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-white/10 bg-black/10 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+              Lectura de confianza
+            </p>
+            <p className="mt-3 text-sm text-[var(--text-soft)]">{trustSnapshot.nextAction}</p>
+            {trustSnapshot.latestSellerReplyPreview ? (
+              <p className="mt-3 text-sm text-[var(--text-soft)]">
+                Ultima respuesta del creador:{" "}
+                <span className="text-white">{trustSnapshot.latestSellerReplyPreview}</span>
+              </p>
+            ) : null}
+          </div>
         </div>
 
         <div className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-8">
@@ -128,9 +173,13 @@ export default async function ProductDiscussionDetailPage({ params }: Props) {
                 return (
                   <article key={message.id} className="rounded-2xl border border-white/10 p-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="font-semibold text-white">
-                        {author?.display_name || author?.username || author?.email || "Usuario"}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-white">
+                          {author?.display_name || author?.username || author?.email || "Usuario"}
+                        </p>
+                        {message.author_user_id === vendor?.user_id ? <Badge>Seller</Badge> : null}
+                        {message.author_user_id === discussion.author_user_id ? <Badge>Autor del hilo</Badge> : null}
+                      </div>
                       <p className="text-xs text-[var(--text-soft)]">
                         {new Date(message.created_at).toLocaleString("es-ES")}
                       </p>

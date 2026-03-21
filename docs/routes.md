@@ -2,12 +2,16 @@
 
 ## Public
 - /
+- /categories
+- /games
 - /collections
 - /collections/[slug]
 - /seller/[slug]
 - /categories/[slug]
 - /games/[slug]
 - /products
+- /bundles
+- /deals
 - /products/[slug]
 - /products/[slug]/discussions/[discussionId]
 - /bundles/[slug]
@@ -22,6 +26,7 @@
 
 ## Authenticated
 - /dashboard
+- /account
 - /feed
 - /seller
 - /seller/new
@@ -44,16 +49,20 @@
 - /admin/audit
 - /admin/licenses
 - /admin/products/[id]
+- /admin/disputes/[disputeId]
 - /seller/products/[id]
+  - workspace seller for releases, support, promotions and compact post-sale continuity
 - /seller/products/[id]/edit
 - /seller/products/[id]/promotions
 - /seller/products/[id]/support
+  - seller product support queue plus the same post-sale continuity panel
 - /seller/bundles/new
 - /seller/bundles/[id]/edit
 - /checkout/[productId]
 - /checkout/bundles/[bundleId]
 - /orders
 - /disputes
+- /disputes/[disputeId]
 - /support
 - /support/tickets/[ticketId]
 - /licenses
@@ -92,7 +101,7 @@
 - /api/admin/editorial/policies/[id]
 - /api/admin/risk/[riskEventId]/status
 - /api/admin/disputes/[disputeId]/status
+- /api/admin/disputes/[disputeId]/refund
 - /api/reviews/[productId]
 
 ## Future
-- /account

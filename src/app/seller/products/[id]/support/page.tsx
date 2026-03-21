@@ -1,9 +1,11 @@
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
+import { SellerProductPostSalePanel } from "@/components/seller/seller-product-post-sale-panel";
 import {
   SellerProductSupportWorkspace,
   type SellerProductSupportTicketItem,
 } from "@/components/seller/seller-product-support-workspace";
 import { requireOwnedProductContext } from "@/lib/auth/seller";
+import { getSellerProductPostSaleSnapshot } from "@/lib/seller/post-sale-visibility";
 
 type SupportTicketStatus = "open" | "waiting_seller" | "waiting_buyer" | "closed";
 
@@ -57,6 +59,7 @@ export default async function SellerProductSupportPage({
   const resolvedSearchParams = (await searchParams) || {};
   const selectedStatus = normalizeStatus(resolvedSearchParams.status);
   const { supabase, vendor, product } = await requireOwnedProductContext(id);
+  const postSaleSnapshot = await getSellerProductPostSaleSnapshot(product.id, vendor.id);
 
   const [ticketsResult, activeReleaseResult] = await Promise.all([
     supabase
@@ -144,6 +147,9 @@ export default async function SellerProductSupportPage({
     <main>
       <SiteHeaderServer />
       <section className="container-shell py-16">
+        <div className="mb-8">
+          <SellerProductPostSalePanel productId={product.id} snapshot={postSaleSnapshot} />
+        </div>
         <SellerProductSupportWorkspace
           productId={product.id}
           productTitle={product.title}

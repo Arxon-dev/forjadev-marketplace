@@ -91,10 +91,22 @@
 - `moderation_flags` stores active moderation attention markers that can prioritize the review queue
 - `license_anomalies` stores suspicious license/download patterns such as bursts and revocations
 - `disputes` stores the buyer/admin dispute workflow and can now be opened from completed orders and moved by admins through review, resolution or rejection
+- `orders.status = refunded` is now used as an operational post-sale outcome, not just a dormant status value
 - `product_risk_snapshots` persists a normalized operational risk score per product for moderation prioritization
 - `seller_risk_snapshots` persists a normalized operational risk score per seller for admin risk triage and intelligence weighting
 - published product releases generate buyer notifications automatically when a new product file is attached to a version for an approved product
 - `/orders` now acts as the buyer post-purchase hub by combining orders, licenses, download eligibility, support entry points and dispute continuity over these tables
+- `/licenses` now acts as the buyer ownership and access library by combining completed purchases, license state, download eligibility, redownload history and continuity to support and orders
+- `/support` now acts as the buyer resolution center by combining support ticket state, last activity, next action, order continuity, license context and dispute escalation status
+- `/disputes` now acts as the buyer/admin dispute casework module by combining dispute state, next action, linked order/license, related support continuity and audit timeline
+- `/feed` now acts as the buyer engagement-return hub by combining followed sellers, wishlist signals, relevant public collections and personalized commerce recommendations
+- `/account` now acts as the user control center by combining editable profile identity, linked external identities, unread-notification visibility and direct continuity to orders, licenses, feed and collection signals
+- seller product operations now include a product-level post-sale continuity snapshot built from `support_tickets`, `disputes`, `order_items`, `orders`, `licenses` and `risk_events`
+- seller post-sale visibility is intentionally aggregated and does not expose buyer-private dispute evidence
+- seller/admin product intelligence now derives from `product_analytics_daily`, `support_tickets`, `disputes`, `campaigns`, `coupons` and `product_risk_snapshots` to expose a shared action-oriented product health read without opening a larger BI layer
+- admin dispute operations can now issue a refund outcome that marks the order as `refunded`, revokes the linked license and closes the dispute with audit and notification traceability
+- post-sale guardrails now derive from existing `orders`, `disputes`, `licenses`, `license_anomalies`, `risk_events` and `audit_logs` so admins can review repeat refunds, revoked-license history and anomaly context before issuing another refund
+- issuing a refund under relevant post-sale signals now opens a dedicated `risk_events` entry linked to the dispute for follow-up in `/admin/risk`
 
 ## Security notes
 - RLS on all user-owned tables

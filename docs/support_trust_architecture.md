@@ -29,13 +29,15 @@ Close the functional architecture for the public trust layer before building pub
 
 ### Authenticated user surfaces
 - `/orders`
-  - purchase history, support entry, dispute entry
+  - purchase history, support entry, dispute entry and buyer-facing post-sale clarity
 - `/licenses`
-  - license state and validation impact
+  - ownership library, license state, refund impact, access continuity and historical transparency after refund
 - `/support`
-  - buyer and seller ticket queues
+  - buyer resolution center, seller ticket queue and next-step clarity without splitting the post-sale meaning across routes
 - `/disputes`
-  - administrative escalation status
+  - buyer/admin dispute casework, administrative escalation status, refund outcome and clear expectation-setting for the buyer
+- `/seller/products/[id]`
+  - seller post-sale continuity, compact trust visibility and product-level reaction signals
 
 ## Required public page blocks
 
@@ -112,8 +114,13 @@ Close the functional architecture for the public trust layer before building pub
 - product pages remain the source of seller-specific support, refund and update promises
 - help center articles provide reusable public documentation across products and account flows
 - policy pages define marketplace-wide rules that support tickets and disputes must follow
+- refund outcomes must be reflected consistently across orders, licenses, support and disputes instead of living only in policy copy
 - orders link buyers to support and disputes
 - licenses and downloads clarify access state after purchase
+- support now acts as the buyer-side resolution layer between ownership, active incidents and possible administrative escalation
+- buyer-facing post-sale surfaces now reuse a shared clarity layer so the current state, next action and expected outcome stay legible across orders, licenses, support and disputes
+- admin dispute resolution now includes explicit post-sale guardrails before refund outcomes are granted
+- seller product operations now expose compact post-sale visibility so the seller can react to support, disputes, refunds and revoked access without needing a separate analytics stack
 - seller trust data explains whether a buyer should feel confident opening a ticket or buying
 
 ## Editorial ownership

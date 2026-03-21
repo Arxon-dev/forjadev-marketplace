@@ -1,4 +1,5 @@
 import { ProductCard } from "@/components/marketplace/product-card";
+import { CommerceSectionHeading } from "@/components/marketplace/commerce-surface-system";
 
 interface RailProduct {
   id: string;
@@ -38,12 +39,12 @@ export function DiscoveryRail({
 
   return (
     <section className="mt-16">
-      <div className="mb-8 flex items-end justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-white">{title}</h2>
-          <p className="mt-2 text-sm text-[var(--text-soft)]">{description}</p>
-        </div>
-      </div>
+      <CommerceSectionHeading
+        dataId={`rail-${title.toLowerCase().replace(/\s+/g, "-")}`}
+        eyebrow="Discovery rail"
+        title={title}
+        description={description}
+      />
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {products.map((product) => (

@@ -1,28 +1,26 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { CommerceStage } from "@/components/marketplace/commerce-surface-system";
 
 export function Hero() {
   return (
     <section className="container-shell py-20">
-      <div className="max-w-3xl">
-        <p className="mb-4 text-sm font-medium text-[var(--primary)]">
-          Marketplace premium para creadores
-        </p>
-        <h1 className="text-4xl font-bold tracking-tight text-white md:text-6xl">
-          Publica, vende y descarga plugins, mapas y herramientas para servidores.
-        </h1>
-        <p className="mt-6 max-w-2xl text-base text-[var(--text-soft)] md:text-lg">
-          Empieza con Rust y prepara la plataforma para escalar a mas juegos y categorias.
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/products">
-            <Button>Explorar productos</Button>
-          </Link>
-          <Link href="/seller">
-            <Button variant="secondary">Quiero vender</Button>
-          </Link>
-        </div>
-      </div>
+      <CommerceStage
+        dataId="home-hero"
+        eyebrow="Marketplace premium para creadores"
+        title="Publica, compara y compra recursos con una experiencia comercial mas solida."
+        description="ForjaDev une discovery, confianza y decision de compra en una misma columna vertebral para plugins, mapas y herramientas listas para servidores."
+        align="split"
+        actions={[
+          { label: "Explorar productos", href: "/products", variant: "primary" },
+          { label: "Ver deals", href: "/deals", variant: "secondary" },
+          { label: "Quiero vender", href: "/seller", variant: "secondary" },
+        ]}
+        stats={[
+          { label: "Discovery", value: "Catalogo navegable" },
+          { label: "Trust", value: "Senales precompra visibles" },
+          { label: "Commerce", value: "Compra con contexto" },
+          { label: "Post-sale", value: "Resolucion ya operativa" },
+        ]}
+      />
     </section>
   );
 }

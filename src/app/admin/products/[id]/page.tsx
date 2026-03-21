@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ProductHealthPanel } from "@/components/intelligence/product-health-panel";
 import { ModerationActions } from "@/components/admin/moderation-actions";
 import { ModerationStatusPill } from "@/components/admin/moderation-status-pill";
 import { RiskScoreMeter } from "@/components/admin/risk-score-meter";
@@ -8,6 +9,7 @@ import { RiskSeverityPill } from "@/components/admin/risk-severity-pill";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { Button } from "@/components/ui/button";
 import { requireAdminContext } from "@/lib/auth/admin";
+import { getProductHealthSnapshot } from "@/lib/intelligence/product-health";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -67,6 +69,7 @@ export default async function AdminProductReviewPage({ params }: Props) {
       .eq("vendor_id", product.vendor_id)
       .maybeSingle(),
   ]);
+  const productHealthSnapshot = await getProductHealthSnapshot(product.id, product.vendor_id);
 
   return (
     <main>
@@ -171,6 +174,10 @@ export default async function AdminProductReviewPage({ params }: Props) {
                   </p>
                 ) : null}
               </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <ProductHealthPanel snapshot={productHealthSnapshot} audience="admin" />
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">

@@ -37,6 +37,18 @@ export function SiteHeader({
           <Link href="/products" className="text-sm text-[var(--text-soft)] hover:text-white">
             Productos
           </Link>
+          <Link href="/categories" className="text-sm text-[var(--text-soft)] hover:text-white">
+            Categorias
+          </Link>
+          <Link href="/games" className="text-sm text-[var(--text-soft)] hover:text-white">
+            Juegos
+          </Link>
+          <Link href="/bundles" className="text-sm text-[var(--text-soft)] hover:text-white">
+            Bundles
+          </Link>
+          <Link href="/deals" className="text-sm text-[var(--text-soft)] hover:text-white">
+            Deals
+          </Link>
           <Link href="/collections" className="text-sm text-[var(--text-soft)] hover:text-white">
             Colecciones
           </Link>
@@ -49,6 +61,11 @@ export function SiteHeader({
           <Link href="/seller" className="text-sm text-[var(--text-soft)] hover:text-white">
             Vender
           </Link>
+          {user ? (
+            <Link href="/account" className="text-sm text-[var(--text-soft)] hover:text-white">
+              Cuenta
+            </Link>
+          ) : null}
           {user ? (
             <Link href="/dashboard" className="text-sm text-[var(--text-soft)] hover:text-white">
               Dashboard

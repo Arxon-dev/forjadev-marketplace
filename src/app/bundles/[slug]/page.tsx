@@ -1,10 +1,14 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckoutButton } from "@/components/checkout/checkout-button";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
+import { CommerceSectionHeading, CommerceStage } from "@/components/marketplace/commerce-surface-system";
 import { Badge } from "@/components/ui/badge";
 import { getPublicDealsForBundles } from "@/lib/promotions/public";
+import { buildBundleDetailMetadata } from "@/lib/seo/public-metadata";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 interface Props {
@@ -24,30 +28,89 @@ interface BundleProductItem {
 
 interface BundleProductRow {
   sort_order: number;
-  product: BundleProductItem[];
+  product: BundleProductItem | BundleProductItem[] | null;
+}
+
+interface BundleVendorRow {
+  id: string;
+  store_name: string;
+  slug: string | null;
+}
+
+interface BundleMetadataRow {
+  title: string;
+  slug: string;
+  short_description: string | null;
+  is_active: boolean;
+}
+
+interface BundleDetailRow {
+  id: string;
+  vendor_id: string;
+  title: string;
+  slug: string;
+  short_description: string | null;
+  description: string | null;
+  featured_image_url: string | null;
+  price_cents: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+function resolveBundleProduct(
+  product: BundleProductItem | BundleProductItem[] | null
+): BundleProductItem | null {
+  return Array.isArray(product) ? (product[0] ?? null) : product;
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const adminSupabase = createAdminClient();
+  const { data: bundleData } = await adminSupabase
+    .from("bundles")
+    .select("title, slug, short_description, is_active")
+    .eq("slug", slug)
+    .maybeSingle();
+  const bundle = bundleData as BundleMetadataRow | null;
+
+  if (!bundle || !bundle.is_active) {
+    return buildBundleDetailMetadata({
+      title: "Bundle",
+      slug,
+      description: "Bundle comercial en ForjaDev Marketplace.",
+    });
+  }
+
+  return buildBundleDetailMetadata({
+    title: bundle.title,
+    slug: bundle.slug,
+    description: bundle.short_description,
+  });
 }
 
 export default async function BundleDetailPage({ params }: Props) {
   const { slug } = await params;
   const supabase = await createClient();
+  const adminSupabase = createAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: bundle } = await supabase
+  const { data: bundleData } = await adminSupabase
     .from("bundles")
     .select("id, vendor_id, title, slug, short_description, description, featured_image_url, price_cents, is_active, created_at")
     .eq("slug", slug)
     .eq("is_active", true)
     .single();
+  const bundle = bundleData as BundleDetailRow | null;
 
   if (!bundle) {
     notFound();
   }
 
   const [{ data: vendor }, { data: bundleProducts }] = await Promise.all([
-    supabase.from("vendors").select("id, store_name, slug").eq("id", bundle.vendor_id).single(),
-    supabase
+    adminSupabase.from("vendors").select("id, store_name, slug").eq("id", bundle.vendor_id).single(),
+    adminSupabase
       .from("bundle_products")
       .select(
         "sort_order, product:products!inner(id, title, slug, short_description, price_cents, featured_image_url, compatibility, moderation_status)"
@@ -55,10 +118,11 @@ export default async function BundleDetailPage({ params }: Props) {
       .eq("bundle_id", bundle.id)
       .order("sort_order", { ascending: true }),
   ]);
+  const resolvedVendor = vendor as BundleVendorRow | null;
 
   const includedProducts = ((bundleProducts || []) as BundleProductRow[])
-    .map((item) => item.product[0])
-    .filter(Boolean)
+    .map((item) => resolveBundleProduct(item.product))
+    .filter((product): product is BundleProductItem => Boolean(product))
     .filter((product) => product.moderation_status === "approved");
 
   if (includedProducts.length === 0) {
@@ -81,20 +145,38 @@ export default async function BundleDetailPage({ params }: Props) {
     <main>
       <SiteHeaderServer />
       <section className="container-shell py-16">
-        <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--text-soft)]">
-          <Link href="/products" className="hover:text-white">
-            Productos
-          </Link>
-          <span>/</span>
-          <span className="text-white">Bundle</span>
-        </div>
+        <CommerceStage
+          dataId="bundle-detail-stage"
+          eyebrow="Bundle Detail"
+          title={bundle.title}
+          description={
+            bundle.short_description ||
+            "Compra varios productos aprobados en una sola operacion comercial con ahorro visible y continuidad real hacia checkout y biblioteca."
+          }
+          surface="context"
+          path={
+            <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--text-soft)]">
+              <Link href="/bundles" className="hover:text-white">
+                Bundles
+              </Link>
+              <span>/</span>
+              <span className="text-white">{bundle.title}</span>
+            </div>
+          }
+          actions={[
+            { label: "Explorar bundles", href: "/bundles", variant: "secondary" },
+            { label: "Ver catalogo", href: "/products", variant: "secondary" },
+          ]}
+          stats={[
+            { label: "Productos incluidos", value: String(includedProducts.length) },
+            { label: "Ahorro total", value: `EUR ${(totalSavingsCents / 100).toFixed(2)}` },
+          ]}
+        />
 
         <div className="mt-8 grid gap-10 lg:grid-cols-[1.2fr_0.8fr]">
           <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-[var(--text-soft)]">Bundle</p>
-            <h1 className="mt-3 text-4xl font-bold text-white">{bundle.title}</h1>
             <p className="mt-3 text-sm text-[var(--text-soft)]">
-              Por {vendor?.store_name || "Tienda"} | {includedProducts.length} productos incluidos
+              Por {resolvedVendor?.store_name || "Tienda"} | {includedProducts.length} productos incluidos
             </p>
 
             {bundle.featured_image_url ? (
@@ -112,14 +194,22 @@ export default async function BundleDetailPage({ params }: Props) {
             ) : null}
 
             <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
-              <h2 className="text-xl font-semibold text-white">Descripcion</h2>
+              <CommerceSectionHeading
+                eyebrow="Oferta agrupada"
+                title="Descripcion"
+                description="Explica por que este bundle merece la pena como bloque comercial completo y no solo como una promo aislada."
+              />
               <p className="mt-4 whitespace-pre-wrap text-[var(--text-soft)]">
                 {bundle.description || "Este bundle no tiene descripcion detallada todavia."}
               </p>
             </div>
 
             <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
-              <h2 className="text-xl font-semibold text-white">Contenido del bundle</h2>
+              <CommerceSectionHeading
+                eyebrow="Contenido incluido"
+                title="Contenido del bundle"
+                description="Cada producto mantiene continuidad hacia su propia ficha para comparar antes de comprar el pack completo."
+              />
               <div className="mt-5 space-y-4">
                 {includedProducts.map((product, index) => (
                   <div
@@ -196,16 +286,20 @@ export default async function BundleDetailPage({ params }: Props) {
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <h2 className="text-xl font-semibold text-white">Resumen comercial</h2>
+              <CommerceSectionHeading
+                eyebrow="Compra con contexto"
+                title="Resumen comercial"
+                description="El bundle mantiene continuidad con seller, productos incluidos y valor agrupado antes de pasar al checkout."
+              />
               <div className="mt-4 space-y-3 text-sm text-[var(--text-soft)]">
                 <p>
                   Creador:{" "}
-                  {vendor?.slug ? (
-                    <Link href={`/seller/${vendor.slug}`} className="text-white hover:underline">
-                      {vendor.store_name}
+                  {resolvedVendor?.slug ? (
+                    <Link href={`/seller/${resolvedVendor.slug}`} className="text-white hover:underline">
+                      {resolvedVendor.store_name}
                     </Link>
                   ) : (
-                    <span className="text-white">{vendor?.store_name || "Tienda"}</span>
+                    <span className="text-white">{resolvedVendor?.store_name || "Tienda"}</span>
                   )}
                 </p>
                 <p>
@@ -216,6 +310,9 @@ export default async function BundleDetailPage({ params }: Props) {
                 </p>
                 <p>
                   Ahorro total: <span className="text-white">EUR {(totalSavingsCents / 100).toFixed(2)}</span>
+                </p>
+                <p>
+                  Continuidad postcompra: <span className="text-white">una orden unica y licencias por producto</span>
                 </p>
                 {activeDeal ? (
                   <p>
