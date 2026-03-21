@@ -5,6 +5,7 @@ import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
+import { commercePanelClassName } from "@/components/marketplace/commerce-surface-system";
 import { buildPublicMetadata } from "@/lib/seo/public-metadata";
 import { createClient } from "@/lib/supabase/server";
 
@@ -96,7 +97,7 @@ export default async function GamesIndexPage() {
               href={`/games/${game.slug}`}
               className="block transition-transform hover:-translate-y-1"
             >
-              <Card className="h-full p-6 hover:bg-white/[0.07]">
+              <Card className={`${commercePanelClassName("tile")} h-full p-6 hover:bg-white/[0.08]`}>
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-xl font-semibold text-white">{game.name}</h2>
                   <Badge>{productCountByGameId.get(game.id) || 0} productos</Badge>

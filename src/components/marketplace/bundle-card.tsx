@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { commercePanelClassName } from "@/components/marketplace/commerce-surface-system";
 
 interface BundleCardProps {
   title: string;
@@ -35,7 +36,7 @@ export function BundleCard({
   return (
     <Link href={href} className="block transition-transform hover:-translate-y-1">
       <Card
-        className="overflow-hidden rounded-[1.9rem] border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.065),rgba(255,255,255,0.03))] p-4 shadow-[0_18px_50px_rgba(2,8,23,0.24)] hover:bg-white/[0.07]"
+        className={`${commercePanelClassName("tile")} overflow-hidden p-4 transition hover:-translate-y-0.5 hover:bg-white/[0.08]`}
         data-premium-card="bundle"
       >
         {imageUrl ? (
@@ -73,6 +74,10 @@ export function BundleCard({
           <p className="mt-4 text-sm leading-6 text-[var(--text-soft)]">{shortDescription}</p>
         ) : null}
 
+        <p className="mt-4 text-sm leading-6 text-[var(--text-soft)]">
+          Pack comercial listo para comparar ahorro, contenido incluido y continuidad a compra.
+        </p>
+
         <div className="mt-4 flex flex-wrap gap-2">
           <Badge>{itemCount} productos</Badge>
           <Badge>{savingsLabel}</Badge>
@@ -109,9 +114,9 @@ export function BundleCard({
 
         <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-soft)]">
-            Listo para comparar
+            Valor agrupado visible
           </p>
-          <p className="text-sm font-semibold text-white">Ver bundle</p>
+          <p className="text-sm font-semibold text-white">Abrir bundle completo</p>
         </div>
       </Card>
     </Link>

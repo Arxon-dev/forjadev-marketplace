@@ -9,12 +9,14 @@ import { DiscussionThreadForm } from "@/components/community/discussion-thread-f
 import { ProductCommerceHelpPanel } from "@/components/help/product-commerce-help-panel";
 import { WishlistButton } from "@/components/community/wishlist-button";
 import { CommerceSectionHeading, CommerceStage } from "@/components/marketplace/commerce-surface-system";
+import { ProductCompositionPanel } from "@/components/marketplace/product-composition-panel";
 import { ProductCard } from "@/components/marketplace/product-card";
 import { ShoppingQualitySummary } from "@/components/marketplace/shopping-quality-summary";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { ReviewForm } from "@/components/reviews/review-form";
 import { Badge } from "@/components/ui/badge";
 import { getProductCommerceHelpContext } from "@/lib/help/public";
+import { getProductCompositionOptions } from "@/lib/commerce/product-composition";
 import { getSimilarProducts, getUsersAlsoBoughtProducts } from "@/lib/intelligence/recommendations";
 import { buildShoppingQualitySnapshot } from "@/lib/marketplace/quality-signals";
 import { buildDiscussionTrustSnapshot } from "@/lib/community/discussion-trust";
@@ -215,6 +217,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     .order("created_at", { ascending: true });
 
   const productCommerceHelpContext = await getProductCommerceHelpContext(supabase, product.id, 2, 2);
+  const productCompositionBundles = await getProductCompositionOptions(product.id);
 
   const { data: discussions } = await supabase
     .from("product_discussions")
@@ -1162,6 +1165,12 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
             </div>
           </div>
         </section>
+
+        <ProductCompositionPanel
+          productTitle={product.title}
+          basePriceCents={product.price_cents}
+          bundles={productCompositionBundles}
+        />
 
         {alsoBoughtProducts.length > 0 ? (
           <section className="mt-12">

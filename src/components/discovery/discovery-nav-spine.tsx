@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { CommerceContextBadges } from "@/components/marketplace/commerce-surface-system";
+import {
+  CommerceContextBadges,
+  CommercePanel,
+} from "@/components/marketplace/commerce-surface-system";
 
 interface DiscoveryNavLink {
   label: string;
@@ -30,7 +33,7 @@ function LinkGroup({
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+    <CommercePanel variant="soft" className="p-4">
       <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-soft)]">{title}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {links.map((link) => (
@@ -47,7 +50,7 @@ function LinkGroup({
           </Link>
         ))}
       </div>
-    </div>
+    </CommercePanel>
   );
 }
 
@@ -62,7 +65,7 @@ export function DiscoveryNavSpine({
 }: DiscoveryNavSpineProps) {
   return (
     <section
-      className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(67,132,255,0.14),transparent_26%),linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.025))] p-6 shadow-[0_18px_50px_rgba(2,8,23,0.22)]"
+      className="rounded-[2.15rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(67,132,255,0.16),transparent_26%),radial-gradient(circle_at_top_right,rgba(39,197,180,0.12),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.028))] p-6 shadow-[0_22px_55px_rgba(2,8,23,0.24)]"
       data-discovery-spine="marketplace"
     >
       {path.length > 0 ? (
@@ -82,7 +85,10 @@ export function DiscoveryNavSpine({
         </div>
       ) : null}
 
-      <p className="text-sm uppercase tracking-[0.2em] text-[var(--text-soft)]">{eyebrow}</p>
+      <p className="inline-flex items-center gap-3 text-sm uppercase tracking-[0.2em] text-[var(--text-soft)]">
+        <span className="h-px w-8 bg-[var(--primary)]/60" />
+        {eyebrow}
+      </p>
       <h2 className="mt-3 text-3xl font-bold text-white">{title}</h2>
       <p className="mt-3 max-w-3xl text-[var(--text-soft)]">{description}</p>
       <div className="mt-5">

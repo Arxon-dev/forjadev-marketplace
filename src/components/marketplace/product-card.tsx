@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import type { ShoppingQualitySnapshot } from "@/lib/marketplace/quality-signals";
 import { trackMarketplaceEvent } from "@/lib/analytics/marketplace";
 import { ShoppingQualitySummary } from "@/components/marketplace/shopping-quality-summary";
+import { commercePanelClassName } from "@/components/marketplace/commerce-surface-system";
 
 interface ProductCardProps {
   title: string;
@@ -46,7 +47,7 @@ export function ProductCard({
 }: ProductCardProps) {
   const content = (
     <Card
-      className="overflow-hidden rounded-[1.9rem] border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.065),rgba(255,255,255,0.03))] p-4 shadow-[0_18px_50px_rgba(2,8,23,0.24)] hover:bg-white/[0.07]"
+      className={`${commercePanelClassName("tile")} overflow-hidden p-4 transition hover:-translate-y-0.5 hover:bg-white/[0.08]`}
       data-premium-card="product"
     >
       {imageUrl ? (
@@ -86,6 +87,9 @@ export function ProductCard({
         <Badge>{category}</Badge>
         <Badge>{compatibility}</Badge>
       </div>
+      <p className="mt-4 text-sm leading-6 text-[var(--text-soft)]">
+        Vista preparada para comparar valor, mantenimiento y soporte sin salir del browse.
+      </p>
       {ratingAverage && ratingCount > 0 ? (
         <div className="mt-4 flex items-center justify-between gap-3 text-sm">
           <p className="font-medium text-white">{ratingAverage.toFixed(1)}/5</p>
@@ -99,9 +103,9 @@ export function ProductCard({
       {qualitySnapshot ? <ShoppingQualitySummary snapshot={qualitySnapshot} variant="compact" /> : null}
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
         <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-soft)]">
-          Preparado para comparar
+          Compara antes de comprar
         </p>
-        <p className="text-sm font-semibold text-white">Ver ficha</p>
+        <p className="text-sm font-semibold text-white">Abrir ficha completa</p>
       </div>
     </Card>
   );

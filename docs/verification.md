@@ -42,6 +42,8 @@ npm run verify:frontend-premium-shopping-journey
 npm run verify:marketplace-quality-signals
 npm run verify:bundles-commercial-block
 npm run verify:campaigns-merchandising-block
+npm run verify:commercial-composition-layer
+npm run verify:visual-premium-public-commerce
 npm run verify:product-discussions-trust-layer
 npm run verify:product-health-intelligence
 npm run verify:collections-feed-engagement-loop
@@ -112,6 +114,14 @@ Coverage summary:
   - public `/deals` as a first-class campaigns and merchandising surface
   - visible promotional value across placements, product deals and bundle deals
   - continuity from the merchandising landing into product and bundle detail
+- `verify:commercial-composition-layer`
+  - product-detail continuity into active bundles that include the current product
+  - clearer comparison between individual purchase and composed bundle value
+  - no added noise for products without a relevant bundle path
+- `verify:visual-premium-public-commerce`
+  - stronger shared premium shell across home, catalog, taxonomy, product detail, bundles and deals
+  - unified stage, section and premium-card language without changing business logic
+  - continuity of the premium system across discovery, merchandising and composed commerce paths
 - `verify:product-discussions-trust-layer`
   - product discussions as a visible trust layer inside product detail and thread detail
   - seller-response visibility, thread status clarity and continuity with the shopping journey

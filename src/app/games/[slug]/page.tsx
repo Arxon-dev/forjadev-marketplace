@@ -4,7 +4,11 @@ import { DiscoveryNavSpine } from "@/components/discovery/discovery-nav-spine";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
-import { CommerceSectionHeading, CommerceStage } from "@/components/marketplace/commerce-surface-system";
+import {
+  CommerceSectionHeading,
+  CommerceStage,
+  commercePanelClassName,
+} from "@/components/marketplace/commerce-surface-system";
 import { ProductCard } from "@/components/marketplace/product-card";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -245,7 +249,7 @@ export default async function GamePage({ params }: GamePageProps) {
                   href={`/products?game=${game.slug}&category=${category.slug}`}
                   className="block transition-transform hover:-translate-y-1"
                 >
-                  <Card className="h-full p-5 hover:bg-white/[0.07]">
+                  <Card className={`${commercePanelClassName("tile")} h-full p-5 hover:bg-white/[0.08]`}>
                     <div className="flex items-center justify-between gap-3">
                       <h3 className="text-lg font-semibold text-white">{category.name}</h3>
                       <Badge>{category.count}</Badge>
