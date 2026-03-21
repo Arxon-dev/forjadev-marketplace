@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MarketplaceTracker } from "@/components/analytics/marketplace-tracker";
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { Button } from "@/components/ui/button";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createOptionalAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 interface CollectionRow {
@@ -38,7 +38,7 @@ interface ProfileRow {
 
 export default async function CollectionsPage() {
   const supabase = await createClient();
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -63,7 +63,7 @@ export default async function CollectionsPage() {
           .order("sort_order", { ascending: true })
           .order("created_at", { ascending: true })
       : Promise.resolve({ data: [] as CollectionItemRow[] }),
-    profileIds.length > 0
+    adminSupabase && profileIds.length > 0
       ? adminSupabase
           .from("profiles")
           .select("id, username, display_name, email")

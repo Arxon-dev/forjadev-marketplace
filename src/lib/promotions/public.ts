@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createOptionalAdminClient } from "@/lib/supabase/admin";
 
 interface DealEligibleProduct {
   id: string;
@@ -120,7 +120,10 @@ export async function getPublicDealsForProducts(products: DealEligibleProduct[])
     return new Map<string, PublicDeal>();
   }
 
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
+  if (!adminSupabase) {
+    return new Map<string, PublicDeal>();
+  }
   const productIds = paidProducts.map((product) => product.id);
   const productById = new Map(paidProducts.map((product) => [product.id, product]));
   const nowIso = new Date().toISOString();
@@ -254,7 +257,10 @@ export async function getPublicDealsForBundles(bundles: DealEligibleBundle[]) {
     return new Map<string, PublicDeal>();
   }
 
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
+  if (!adminSupabase) {
+    return new Map<string, PublicDeal>();
+  }
   const bundleIds = bundles.map((bundle) => bundle.id);
   const bundleById = new Map(bundles.map((bundle) => [bundle.id, bundle]));
   const nowIso = new Date().toISOString();
@@ -335,7 +341,10 @@ export async function getPublicFeaturedPlacements(limit = 6) {
     return [] as PublicFeaturedPlacement[];
   }
 
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
+  if (!adminSupabase) {
+    return [] as PublicFeaturedPlacement[];
+  }
   const nowIso = new Date().toISOString();
 
   const { data: campaigns } = await adminSupabase

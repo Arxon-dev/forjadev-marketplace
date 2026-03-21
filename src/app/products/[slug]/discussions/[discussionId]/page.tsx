@@ -4,7 +4,7 @@ import { DiscussionReplyForm } from "@/components/community/discussion-reply-for
 import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { Badge } from "@/components/ui/badge";
 import { buildDiscussionTrustSnapshot } from "@/lib/community/discussion-trust";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createOptionalAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 interface Props {
@@ -24,7 +24,7 @@ interface ProfileRow {
 export default async function ProductDiscussionDetailPage({ params }: Props) {
   const { slug, discussionId } = await params;
   const supabase = await createClient();
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -67,7 +67,7 @@ export default async function ProductDiscussionDetailPage({ params }: Props) {
     new Set([discussion.author_user_id, ...(messages || []).map((message) => message.author_user_id)])
   );
 
-  const { data: profiles } = authorIds.length
+  const { data: profiles } = adminSupabase && authorIds.length
     ? await adminSupabase
         .from("profiles")
         .select("id, username, display_name, email")

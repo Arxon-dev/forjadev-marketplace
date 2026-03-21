@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { commercePanelClassName } from "@/components/marketplace/commerce-surface-system";
 import { trackMarketplaceEvent } from "@/lib/analytics/marketplace";
 
 interface ProductFiltersProps {
@@ -96,9 +97,21 @@ export function ProductFilters({
   };
 
   return (
-    <div className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-5">
+    <div className={`${commercePanelClassName("section")} mt-8 p-5`}>
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--primary)]">
+            Browse controls
+          </p>
+          <h3 className="mt-2 text-xl font-semibold text-white">Refina el catalogo sin perder contexto comercial</h3>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-soft)]">
+            Busca por intencion, ajusta el rango de browsing y cambia el ranking para comparar con mas criterio.
+          </p>
+        </div>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-[1.4fr_auto]">
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 md:flex-row">
           <input
             type="text"
             value={search}
@@ -108,14 +121,10 @@ export function ProductFilters({
                 pushParams({ q: search.trim() });
               }
             }}
-            className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/30 focus:border-white/30 focus:outline-none"
+            className="flex-1 rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-white placeholder:text-white/30 focus:border-[var(--primary)]/40 focus:outline-none"
             placeholder="Buscar por titulo, descripcion o compatibilidad..."
           />
-          <Button
-            type="button"
-            onClick={() => pushParams({ q: search.trim() })}
-            disabled={isPending}
-          >
+          <Button type="button" onClick={() => pushParams({ q: search.trim() })} disabled={isPending}>
             Buscar
           </Button>
           <Button
@@ -135,12 +144,12 @@ export function ProductFilters({
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        <div>
+        <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
           <p className="mb-3 text-sm font-medium text-white">Juego</p>
           <select
             value={initialGame}
             onChange={(e) => pushParams({ game: e.target.value })}
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-white/30 focus:outline-none"
+            className="w-full rounded-2xl border border-white/10 bg-[var(--surface-3)] px-4 py-3 text-white focus:border-[var(--primary)]/40 focus:outline-none"
             disabled={isPending}
           >
             <option value="all">Todos los juegos</option>
@@ -152,12 +161,12 @@ export function ProductFilters({
           </select>
         </div>
 
-        <div>
+        <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
           <p className="mb-3 text-sm font-medium text-white">Categoria</p>
           <select
             value={initialCategory}
             onChange={(e) => pushParams({ category: e.target.value })}
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-white/30 focus:outline-none"
+            className="w-full rounded-2xl border border-white/10 bg-[var(--surface-3)] px-4 py-3 text-white focus:border-[var(--primary)]/40 focus:outline-none"
             disabled={isPending}
           >
             <option value="all">Todas las categorias</option>
@@ -171,7 +180,7 @@ export function ProductFilters({
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        <div>
+        <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
           <p className="mb-3 text-sm font-medium text-white">Precio</p>
           <div className="flex flex-wrap gap-3">
             {pricingOptions.map((option) => (
@@ -188,7 +197,7 @@ export function ProductFilters({
           </div>
         </div>
 
-        <div>
+        <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
           <p className="mb-3 text-sm font-medium text-white">Orden</p>
           <div className="flex flex-wrap gap-3">
             {sortOptions.map((option) => (

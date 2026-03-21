@@ -9,7 +9,7 @@ import { computeQualityTrustScore } from "@/lib/intelligence/catalog";
 import { buildShoppingQualitySnapshot } from "@/lib/marketplace/quality-signals";
 import { getPublicDealsForProducts } from "@/lib/promotions/public";
 import { buildCatalogListingMetadata } from "@/lib/seo/public-metadata";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createOptionalAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 interface ProductsPageProps {
@@ -60,7 +60,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const category = params.category || "all";
 
   const supabase = await createClient();
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
 
   const [{ data: games }, { data: categories }] = await Promise.all([
     supabase
@@ -170,7 +170,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const { data: productsData } = await productsQuery;
   let products = productsData || [];
 
-  if (sort === "quality_trust" && products.length > 0) {
+  if (sort === "quality_trust" && products.length > 0 && adminSupabase) {
     const vendorIdsForRanking = Array.from(new Set(products.map((product) => product.vendor_id)));
     const productIdsForRanking = products.map((product) => product.id);
 
@@ -259,7 +259,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const vendorRows = vendorsResult.data || [];
   const vendorUserIds = Array.from(new Set(vendorRows.map((vendor) => vendor.user_id).filter(Boolean)));
   const [sellerSnapshotsResult, identitiesResult] = await Promise.all([
-    vendorIds.length > 0
+    adminSupabase && vendorIds.length > 0
       ? adminSupabase
           .from("seller_reputation_snapshots")
           .select("vendor_id, approved_products, total_purchases, latest_product_update_at")
@@ -272,7 +272,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             latest_product_update_at: string | null;
           }>,
         }),
-    vendorUserIds.length > 0
+    adminSupabase && vendorUserIds.length > 0
       ? adminSupabase.from("user_provider_identities").select("user_id").in("user_id", vendorUserIds)
       : Promise.resolve({ data: [] as Array<{ user_id: string }> }),
   ]);

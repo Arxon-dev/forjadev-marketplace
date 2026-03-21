@@ -6,7 +6,8 @@ import { BundleCard } from "@/components/marketplace/bundle-card";
 import { CommerceSectionHeading } from "@/components/marketplace/commerce-surface-system";
 import { getPublicDealsForBundles } from "@/lib/promotions/public";
 import { buildBundleListingMetadata } from "@/lib/seo/public-metadata";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createOptionalAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 interface BundleRow {
   id: string;
@@ -58,9 +59,11 @@ function resolveBundleProduct(product: BundleProduct | BundleProduct[] | null): 
 export const metadata: Metadata = buildBundleListingMetadata();
 
 export default async function BundlesPage() {
-  const adminSupabase = createAdminClient();
+  const supabase = await createClient();
+  const adminSupabase = createOptionalAdminClient();
+  const queryClient = adminSupabase ?? supabase;
 
-  const { data: bundlesData } = await adminSupabase
+  const { data: bundlesData } = await queryClient
     .from("bundles")
     .select("id, vendor_id, title, slug, short_description, featured_image_url, price_cents")
     .eq("is_active", true)
@@ -73,7 +76,7 @@ export default async function BundlesPage() {
   const [bundleProductsResult, vendorsResult, snapshotsResult, categoriesResult, gamesResult] =
     await Promise.all([
       bundleIds.length > 0
-        ? adminSupabase
+        ? queryClient
             .from("bundle_products")
             .select(
               "bundle_id, sort_order, product:products!inner(id, title, slug, price_cents, moderation_status, category_id, game_id)"
@@ -82,27 +85,27 @@ export default async function BundlesPage() {
             .order("sort_order", { ascending: true })
         : Promise.resolve({ data: [] as BundleProductRow[] }),
       vendorIds.length > 0
-        ? adminSupabase.from("vendors").select("id, store_name").in("id", vendorIds)
+        ? queryClient.from("vendors").select("id, store_name").in("id", vendorIds)
         : Promise.resolve({ data: [] as Array<{ id: string; store_name: string }> }),
-      vendorIds.length > 0
+      adminSupabase && vendorIds.length > 0
         ? adminSupabase
             .from("seller_reputation_snapshots")
             .select("vendor_id, approved_products, total_purchases")
             .in("vendor_id", vendorIds)
         : Promise.resolve({
-            data: [] as Array<{
-              vendor_id: string;
-              approved_products: number;
-              total_purchases: number;
-            }>,
-          }),
-      adminSupabase
+          data: [] as Array<{
+            vendor_id: string;
+            approved_products: number;
+            total_purchases: number;
+          }>,
+        }),
+      queryClient
         .from("categories")
         .select("id, name, slug")
         .eq("is_active", true)
         .order("sort_order", { ascending: true })
         .order("name", { ascending: true }),
-      adminSupabase
+      queryClient
         .from("games")
         .select("id, name, slug")
         .eq("is_active", true)

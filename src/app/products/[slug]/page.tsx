@@ -22,7 +22,7 @@ import { buildShoppingQualitySnapshot } from "@/lib/marketplace/quality-signals"
 import { buildDiscussionTrustSnapshot } from "@/lib/community/discussion-trust";
 import { getPublicDealsForProducts } from "@/lib/promotions/public";
 import { buildPublicMetadata } from "@/lib/seo/public-metadata";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createOptionalAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicSellerProfile } from "@/lib/sellers/public";
 
@@ -131,7 +131,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   const { slug } = await params;
   const resolvedSearchParams = (await searchParams) || {};
   const supabase = await createClient();
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
 
   const {
     data: { user },
@@ -335,7 +335,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
           .select("discussion_id, author_user_id, body, created_at")
           .in("discussion_id", discussionIds)
       : Promise.resolve({ data: [] as DiscussionMessageRow[] }),
-    discussionAuthorIds.length > 0
+    adminSupabase && discussionAuthorIds.length > 0
       ? adminSupabase
           .from("profiles")
           .select("id, username, display_name, email")
@@ -356,9 +356,11 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
 
   const [{ count: wishlistCount }, wishlistEntryResult, userCollectionsResult] = await Promise.all([
     adminSupabase
-      .from("wishlists")
-      .select("*", { count: "exact", head: true })
-      .eq("product_id", product.id),
+      ? adminSupabase
+          .from("wishlists")
+          .select("*", { count: "exact", head: true })
+          .eq("product_id", product.id)
+      : Promise.resolve({ count: 0 }),
     user
       ? supabase
           .from("wishlists")

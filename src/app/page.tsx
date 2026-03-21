@@ -142,7 +142,7 @@ export default async function HomePage() {
     .filter((item) => item.entityType === "bundle")
     .map((item) => item.entityId);
 
-  const [featuredResult, trendingResult, updatedResult, categoriesResult, placementProductsResult, placementBundlesResult] = await Promise.all([
+  const [featuredResult, trendingResult, updatedResult, categoriesResult, placementProductsResult, placementBundlesResult, bundleCountResult] = await Promise.all([
     supabase
       .from("products")
       .select(
@@ -195,6 +195,10 @@ export default async function HomePage() {
           .eq("is_active", true)
           .in("id", placementBundleIds)
       : Promise.resolve({ data: [] as DiscoveryBundleRow[] }),
+    supabase
+      .from("bundles")
+      .select("id", { count: "exact", head: true })
+      .eq("is_active", true),
   ]);
 
   const fallbackFeaturedResult =
@@ -352,7 +356,20 @@ export default async function HomePage() {
     <main>
       <SiteHeaderServer />
       <MarketplaceTracker eventName="homepage.visited" pageType="home" />
-      <Hero />
+      <Hero
+        categoryCount={(categoriesResult.data || []).length}
+        activeDealCount={dealRailProducts.length}
+        bundleCount={bundleCountResult.count || 0}
+        placementCount={placementRailItems.length}
+        featuredCategory={
+          (categoriesResult.data || [])[0]
+            ? {
+                name: (categoriesResult.data || [])[0].name,
+                slug: (categoriesResult.data || [])[0].slug,
+              }
+            : null
+        }
+      />
 
       <section className="container-shell pb-20">
         <BrowseCategories categories={categoriesResult.data || []} />

@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createOptionalAdminClient } from "@/lib/supabase/admin";
 import { getPublicDealsForBundles } from "@/lib/promotions/public";
 
 interface BundleRow {
@@ -57,7 +57,10 @@ export interface ProductCompositionBundle {
 }
 
 export async function getProductCompositionOptions(productId: string) {
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
+  if (!adminSupabase) {
+    return [] as ProductCompositionBundle[];
+  }
 
   const { data: bundleLinks } = await adminSupabase
     .from("bundle_products")

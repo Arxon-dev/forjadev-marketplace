@@ -5,7 +5,7 @@ import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { ProductCard } from "@/components/marketplace/product-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createOptionalAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 interface CollectionPageProps {
@@ -54,7 +54,7 @@ interface CollectionItemRow {
 export default async function CollectionDetailPage({ params }: CollectionPageProps) {
   const { slug } = await params;
   const supabase = await createClient();
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
 
   const { data: collection } = await supabase
     .from("collections")
@@ -76,10 +76,12 @@ export default async function CollectionDetailPage({ params }: CollectionPagePro
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
     adminSupabase
-      .from("profiles")
-      .select("id, username, display_name, email")
-      .eq("id", collection.user_id)
-      .maybeSingle(),
+      ? adminSupabase
+          .from("profiles")
+          .select("id, username, display_name, email")
+          .eq("id", collection.user_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const items = ((collectionItemsData || []) as CollectionItemRow[])

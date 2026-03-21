@@ -6,7 +6,7 @@ import { SiteHeaderServer } from "@/components/layout/site-header-server";
 import { ProductCard } from "@/components/marketplace/product-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createOptionalAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/cn";
 import { getPublicSellerProfile } from "@/lib/sellers/public";
@@ -32,7 +32,7 @@ function badgeToneClass(tone: "primary" | "success" | "warning") {
 export default async function SellerProfilePage({ params }: SellerProfilePageProps) {
   const { slug } = await params;
   const supabase = await createClient();
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -99,9 +99,11 @@ export default async function SellerProfilePage({ params }: SellerProfilePagePro
 
   const [{ count: followerCount }, followEntryResult] = await Promise.all([
     adminSupabase
-      .from("seller_followers")
-      .select("*", { count: "exact", head: true })
-      .eq("vendor_id", seller.vendor.id),
+      ? adminSupabase
+          .from("seller_followers")
+          .select("*", { count: "exact", head: true })
+          .eq("vendor_id", seller.vendor.id)
+      : Promise.resolve({ count: 0 }),
     user
       ? supabase
           .from("seller_followers")

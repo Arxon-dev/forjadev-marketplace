@@ -47,26 +47,26 @@ function joinClassNames(...classNames: Array<string | null | undefined>) {
 
 function actionClassName(variant: "primary" | "secondary") {
   if (variant === "secondary") {
-    return "inline-flex min-h-11 items-center rounded-full border border-white/10 bg-white/7 px-5 py-2.5 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/12";
+    return "inline-flex min-h-11 items-center rounded-full border border-[var(--border-strong)] bg-white/[0.06] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(2,8,23,0.16)] transition hover:border-white/30 hover:bg-white/[0.1]";
   }
 
-  return "inline-flex min-h-11 items-center rounded-full bg-[linear-gradient(135deg,var(--primary),#1fd6c8)] px-5 py-2.5 text-sm font-semibold text-slate-950 shadow-[0_14px_34px_rgba(31,214,200,0.2)] transition hover:opacity-95";
+  return "inline-flex min-h-11 items-center rounded-full bg-[linear-gradient(135deg,var(--primary),var(--teal))] px-5 py-2.5 text-sm font-semibold text-slate-950 shadow-[0_18px_38px_rgba(31,214,200,0.22)] transition hover:translate-y-[-1px] hover:opacity-95";
 }
 
 export function commercePanelClassName(variant: "stage" | "section" | "tile" | "soft" = "section") {
   if (variant === "stage") {
-    return "rounded-[2.35rem] border border-white/12 bg-[radial-gradient(circle_at_top_left,rgba(39,197,180,0.22),transparent_32%),radial-gradient(circle_at_top_right,rgba(67,132,255,0.18),transparent_28%),linear-gradient(145deg,rgba(255,255,255,0.1),rgba(255,255,255,0.035))] shadow-[0_24px_70px_rgba(2,8,23,0.28)]";
+    return "relative rounded-[2.35rem] border border-[var(--border-strong)] bg-[radial-gradient(circle_at_top_left,rgba(31,214,200,0.2),transparent_28%),radial-gradient(circle_at_85%_0%,rgba(91,140,255,0.22),transparent_30%),linear-gradient(160deg,rgba(255,255,255,0.1),rgba(255,255,255,0.03)_48%,rgba(9,14,28,0.58))] shadow-[var(--shadow-stage)]";
   }
 
   if (variant === "tile") {
-    return "rounded-[1.9rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] shadow-[0_18px_50px_rgba(2,8,23,0.24)]";
+    return "relative rounded-[1.9rem] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(18,27,46,0.82)_42%,rgba(10,16,31,0.96))] shadow-[var(--shadow-panel)]";
   }
 
   if (variant === "soft") {
-    return "rounded-[1.8rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.025))] shadow-[0_18px_40px_rgba(2,8,23,0.18)]";
+    return "relative rounded-[1.8rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(11,16,32,0.68))] shadow-[0_16px_34px_rgba(2,8,23,0.18)]";
   }
 
-  return "rounded-[1.95rem] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.025))] shadow-[0_22px_55px_rgba(2,8,23,0.22)]";
+  return "relative rounded-[1.95rem] border border-[var(--border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(16,24,43,0.8)_55%,rgba(10,16,31,0.95))] shadow-[0_22px_55px_rgba(2,8,23,0.24)]";
 }
 
 export function CommercePanel({
@@ -78,7 +78,7 @@ export function CommercePanel({
 }: CommercePanelProps) {
   return (
     <div
-      className={joinClassNames(commercePanelClassName(variant), className)}
+      className={joinClassNames(commercePanelClassName(variant), "overflow-hidden", className)}
       data-commerce-panel={dataId}
       data-commerce-section={sectionDataId}
     >
@@ -108,7 +108,7 @@ export function CommerceStage({
       className={joinClassNames(panelClassName, "overflow-hidden p-8 lg:p-10")}
       data-commerce-stage={dataId}
     >
-      <div className="pointer-events-none absolute" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_28%,rgba(11,16,32,0.28))]" />
       {path ? <div className="mb-5">{path}</div> : null}
 
       <div className={align === "split" ? "grid gap-8 xl:grid-cols-[1.1fr_0.9fr]" : ""}>
@@ -201,7 +201,7 @@ export function CommerceContextBadges({
       {items.map((item) => (
         <Badge
           key={item}
-          className="border-white/10 bg-black/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white shadow-[0_10px_24px_rgba(2,8,23,0.14)]"
+          className="border-white/10 bg-black/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white shadow-[0_10px_24px_rgba(2,8,23,0.14)]"
         >
           {item}
         </Badge>

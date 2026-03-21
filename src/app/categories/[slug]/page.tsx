@@ -12,7 +12,7 @@ import {
 import { ProductCard } from "@/components/marketplace/product-card";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createOptionalAdminClient } from "@/lib/supabase/admin";
 import { buildShoppingQualitySnapshot } from "@/lib/marketplace/quality-signals";
 import { buildPublicMetadata } from "@/lib/seo/public-metadata";
 import { createClient } from "@/lib/supabase/server";
@@ -56,7 +56,7 @@ export async function generateMetadata({
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = await params;
   const supabase = await createClient();
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
 
   const { data: category } = await supabase
     .from("categories")
@@ -131,7 +131,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const vendorRows = vendorsResult.data || [];
   const vendorUserIds = Array.from(new Set(vendorRows.map((vendor) => vendor.user_id).filter(Boolean)));
   const [sellerSnapshotsResult, identitiesResult] = await Promise.all([
-    vendorIds.length > 0
+    adminSupabase && vendorIds.length > 0
       ? adminSupabase
           .from("seller_reputation_snapshots")
           .select("vendor_id, approved_products, total_purchases, latest_product_update_at")
@@ -144,7 +144,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
             latest_product_update_at: string | null;
           }>,
         }),
-    vendorUserIds.length > 0
+    adminSupabase && vendorUserIds.length > 0
       ? adminSupabase.from("user_provider_identities").select("user_id").in("user_id", vendorUserIds)
       : Promise.resolve({ data: [] as Array<{ user_id: string }> }),
   ]);

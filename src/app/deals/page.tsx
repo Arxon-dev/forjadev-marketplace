@@ -15,7 +15,8 @@ import {
   getPublicFeaturedPlacements,
 } from "@/lib/promotions/public";
 import { buildDealsListingMetadata } from "@/lib/seo/public-metadata";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createOptionalAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 interface ProductRow {
   id: string;
@@ -126,17 +127,21 @@ function resolveBundleProduct(product: BundleProductRow["product"]) {
 export const metadata: Metadata = buildDealsListingMetadata();
 
 export default async function DealsPage() {
-  const adminSupabase = createAdminClient();
+  const supabase = await createClient();
+  const adminSupabase = createOptionalAdminClient();
+  const queryClient = adminSupabase ?? supabase;
   const nowIso = new Date().toISOString();
 
-  const { data: campaignsData } = await adminSupabase
-    .from("campaigns")
-    .select(
-      "title, product_id, bundle_id, campaign_type, discount_type, discount_value, starts_at, ends_at, is_active, created_at"
-    )
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(60);
+  const { data: campaignsData } = adminSupabase
+    ? await adminSupabase
+        .from("campaigns")
+        .select(
+          "title, product_id, bundle_id, campaign_type, discount_type, discount_value, starts_at, ends_at, is_active, created_at"
+        )
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(60)
+    : { data: [] as CampaignRow[] };
 
   const campaigns = ((campaignsData || []) as CampaignRow[]).filter((campaign) =>
     isCampaignLive(campaign, nowIso)
@@ -175,7 +180,7 @@ export default async function DealsPage() {
 
   const [productsResult, bundlesResult, bundleProductsResult] = await Promise.all([
     allProductIds.length > 0
-      ? adminSupabase
+      ? queryClient
           .from("products")
           .select(
             "id, vendor_id, category_id, title, slug, price_cents, is_free, compatibility, featured_image_url, rating_average, rating_count, support_policy, refund_policy, update_policy, updated_at"
@@ -184,14 +189,14 @@ export default async function DealsPage() {
           .in("id", allProductIds)
       : Promise.resolve({ data: [] as ProductRow[] }),
     allBundleIds.length > 0
-      ? adminSupabase
+      ? queryClient
           .from("bundles")
           .select("id, vendor_id, title, slug, short_description, featured_image_url, price_cents")
           .eq("is_active", true)
           .in("id", allBundleIds)
       : Promise.resolve({ data: [] as BundleRow[] }),
     allBundleIds.length > 0
-      ? adminSupabase
+      ? queryClient
           .from("bundle_products")
           .select(
             "bundle_id, sort_order, product:products!inner(id, title, slug, price_cents, moderation_status, category_id, game_id)"
@@ -211,11 +216,11 @@ export default async function DealsPage() {
   const categoryIds = Array.from(new Set(products.map((product) => product.category_id).filter(Boolean))) as string[];
   const vendorRowsPromise =
     vendorIds.length > 0
-      ? adminSupabase.from("vendors").select("id, user_id, store_name").in("id", vendorIds)
+      ? queryClient.from("vendors").select("id, user_id, store_name").in("id", vendorIds)
       : Promise.resolve({ data: [] as VendorRow[] });
   const categoriesPromise =
     categoryIds.length > 0
-      ? adminSupabase.from("categories").select("id, name, slug").in("id", categoryIds)
+      ? queryClient.from("categories").select("id, name, slug").in("id", categoryIds)
       : Promise.resolve({ data: [] as CategoryRow[] });
 
   const [vendorsResult, categoriesResult] = await Promise.all([vendorRowsPromise, categoriesPromise]);
@@ -227,17 +232,17 @@ export default async function DealsPage() {
   ) as string[];
 
   const [snapshotsResult, identitiesResult, gamesResult] = await Promise.all([
-    vendorIds.length > 0
+    adminSupabase && vendorIds.length > 0
       ? adminSupabase
           .from("seller_reputation_snapshots")
           .select("vendor_id, approved_products, total_purchases, latest_product_update_at")
           .in("vendor_id", vendorIds)
       : Promise.resolve({ data: [] as SellerSnapshotRow[] }),
-    vendorUserIds.length > 0
+    adminSupabase && vendorUserIds.length > 0
       ? adminSupabase.from("user_provider_identities").select("user_id").in("user_id", vendorUserIds)
       : Promise.resolve({ data: [] as IdentityRow[] }),
     gameIds.length > 0
-      ? adminSupabase.from("games").select("id, name, slug").in("id", gameIds)
+      ? queryClient.from("games").select("id, name, slug").in("id", gameIds)
       : Promise.resolve({ data: [] as GameRow[] }),
   ]);
 

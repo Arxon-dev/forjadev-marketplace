@@ -93,7 +93,7 @@ export function deriveSellerBadges(
 
 export async function getPublicSellerProfile(
   supabase: SupabaseClientLike,
-  adminSupabase: SupabaseClientLike,
+  adminSupabase: SupabaseClientLike | null,
   slug: string
 ): Promise<PublicSellerProfile | null> {
   const { data: vendor } = await supabase
@@ -133,9 +133,11 @@ export async function getPublicSellerProfile(
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
     adminSupabase
-      .from("user_provider_identities")
-      .select("provider")
-      .eq("user_id", vendor.user_id),
+      ? adminSupabase
+          .from("user_provider_identities")
+          .select("provider")
+          .eq("user_id", vendor.user_id)
+      : Promise.resolve({ data: [] as Array<{ provider: SellerIdentityProvider }> }),
   ]);
   const totalRatings = approvedProducts.reduce((sum, product) => sum + product.rating_count, 0);
   const totalWeightedRating = approvedProducts.reduce(

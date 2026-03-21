@@ -8,7 +8,7 @@ import { CommerceSectionHeading, CommerceStage } from "@/components/marketplace/
 import { Badge } from "@/components/ui/badge";
 import { getPublicDealsForBundles } from "@/lib/promotions/public";
 import { buildBundleDetailMetadata } from "@/lib/seo/public-metadata";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createOptionalAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 interface Props {
@@ -65,8 +65,9 @@ function resolveBundleProduct(
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const adminSupabase = createAdminClient();
-  const { data: bundleData } = await adminSupabase
+  const supabase = await createClient();
+  const queryClient = createOptionalAdminClient() ?? supabase;
+  const { data: bundleData } = await queryClient
     .from("bundles")
     .select("title, slug, short_description, is_active")
     .eq("slug", slug)
@@ -91,12 +92,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function BundleDetailPage({ params }: Props) {
   const { slug } = await params;
   const supabase = await createClient();
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
+  const queryClient = adminSupabase ?? supabase;
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: bundleData } = await adminSupabase
+  const { data: bundleData } = await queryClient
     .from("bundles")
     .select("id, vendor_id, title, slug, short_description, description, featured_image_url, price_cents, is_active, created_at")
     .eq("slug", slug)
@@ -109,8 +111,8 @@ export default async function BundleDetailPage({ params }: Props) {
   }
 
   const [{ data: vendor }, { data: bundleProducts }] = await Promise.all([
-    adminSupabase.from("vendors").select("id, store_name, slug").eq("id", bundle.vendor_id).single(),
-    adminSupabase
+    queryClient.from("vendors").select("id, store_name, slug").eq("id", bundle.vendor_id).single(),
+    queryClient
       .from("bundle_products")
       .select(
         "sort_order, product:products!inner(id, title, slug, short_description, price_cents, featured_image_url, compatibility, moderation_status)"

@@ -34,7 +34,7 @@ function LinkGroup({
 
   return (
     <CommercePanel variant="soft" className="p-4">
-      <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-soft)]">{title}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">{title}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {links.map((link) => (
           <Link key={`${title}:${link.href}:${link.label}`} href={link.href}>
@@ -42,7 +42,7 @@ function LinkGroup({
               className={
                 link.active
                   ? "cursor-pointer border-[var(--primary)]/30 bg-[var(--primary)]/15 text-white hover:opacity-95"
-                  : "cursor-pointer border-white/10 bg-white/5 text-[var(--text-soft)] hover:text-white"
+                  : "cursor-pointer border-white/10 bg-white/5 text-[var(--text-soft)] hover:border-white/20 hover:text-white"
               }
             >
               {link.label}
@@ -65,9 +65,10 @@ export function DiscoveryNavSpine({
 }: DiscoveryNavSpineProps) {
   return (
     <section
-      className="rounded-[2.15rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(67,132,255,0.16),transparent_26%),radial-gradient(circle_at_top_right,rgba(39,197,180,0.12),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.028))] p-6 shadow-[0_22px_55px_rgba(2,8,23,0.24)]"
+      className="relative overflow-hidden rounded-[2.15rem] border border-[var(--border-strong)] bg-[radial-gradient(circle_at_top_left,rgba(91,140,255,0.18),transparent_24%),radial-gradient(circle_at_100%_0%,rgba(31,214,200,0.12),transparent_22%),linear-gradient(155deg,rgba(255,255,255,0.08),rgba(18,27,46,0.84)_50%,rgba(10,16,31,0.98))] p-6 shadow-[0_22px_55px_rgba(2,8,23,0.24)]"
       data-discovery-spine="marketplace"
     >
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_28%,rgba(11,16,32,0.28))]" />
       {path.length > 0 ? (
         <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-[var(--text-soft)]">
           {path.map((item, index) => (

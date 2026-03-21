@@ -38,9 +38,12 @@ export function BrowseCategories({ categories }: BrowseCategoriesProps) {
             href={`/products?category=${category.slug}`}
             className="block transition-transform hover:-translate-y-1"
           >
-            <Card className={`${commercePanelClassName("tile")} h-full p-6 hover:bg-white/[0.08]`}>
+            <Card className={`${commercePanelClassName("tile")} h-full p-6 transition duration-200 hover:border-white/20 hover:shadow-[0_24px_56px_rgba(2,8,23,0.34)]`}>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--primary)]">
+                Entrada editorial
+              </p>
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-white">{category.name}</h3>
+                <h3 className="mt-3 text-lg font-semibold text-white">{category.name}</h3>
                 <Badge className="border-[var(--primary)]/25 bg-[var(--primary)]/15 text-white">
                   Explorar
                 </Badge>

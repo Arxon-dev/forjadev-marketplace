@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createOptionalAdminClient } from "@/lib/supabase/admin";
 import {
   computeQualityTrustScore,
   type ProductRankingSnapshot,
@@ -103,7 +103,10 @@ function buildRecommendationReason(
 }
 
 export async function getUsersAlsoBoughtProducts(productId: string, limit = 3) {
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
+  if (!adminSupabase) {
+    return [] as RecommendedProductRow[];
+  }
 
   const { data: sourcePurchases } = await adminSupabase
     .from("order_items")
@@ -171,7 +174,10 @@ export async function getSimilarProducts(
   },
   limit = 3
 ) {
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
+  if (!adminSupabase) {
+    return [] as RecommendedProductRow[];
+  }
 
   if (!current.categoryId && !current.gameId) {
     return [] as RecommendedProductRow[];
@@ -245,7 +251,10 @@ export async function getSimilarProducts(
 }
 
 export async function getPersonalizedRecommendations(userId: string, limit = 6) {
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
+  if (!adminSupabase) {
+    return [] as PersonalizedRecommendationRow[];
+  }
   const discoveryLimit = Math.max(limit * 6, 24);
 
   const [wishlistResult, followedSellerResult, downloadsResult, purchasesResult] =
@@ -524,7 +533,10 @@ export async function getPersonalizedRecommendations(userId: string, limit = 6) 
 }
 
 export async function getRecommendedBundles(userId: string, limit = 3) {
-  const adminSupabase = createAdminClient();
+  const adminSupabase = createOptionalAdminClient();
+  if (!adminSupabase) {
+    return [] as RecommendedBundleRow[];
+  }
 
   const [followedSellerResult, wishlistResult, downloadsResult, purchasesResult] =
     await Promise.all([

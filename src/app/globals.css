@@ -2,18 +2,32 @@
 
 :root {
   --background: #0b1020;
+  --background-2: #0f172d;
+  --background-3: #17243f;
   --background-soft: #12192b;
   --surface: #111827;
   --surface-2: #172033;
+  --surface-3: rgba(18, 27, 46, 0.92);
+  --panel-strong: rgba(255, 255, 255, 0.08);
+  --panel-soft: rgba(255, 255, 255, 0.04);
   --text: #f3f4f6;
   --text-soft: #aab4c5;
+  --text-muted: #7f8aa1;
   --primary: #5b8cff;
   --primary-hover: #7aa2ff;
+  --primary-soft: rgba(91, 140, 255, 0.18);
   --accent: #7c3aed;
+  --accent-soft: rgba(124, 58, 237, 0.16);
+  --teal: #1fd6c8;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
   --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --shadow-stage: 0 24px 70px rgba(2, 8, 23, 0.34);
+  --shadow-panel: 0 18px 42px rgba(2, 8, 23, 0.26);
+  --radius-panel: 2rem;
+  --radius-card: 1.6rem;
 }
 
 html, body {
@@ -23,6 +37,10 @@ html, body {
 
 body {
   min-height: 100vh;
+  background-image:
+    radial-gradient(circle at top, rgba(91, 140, 255, 0.16), transparent 32%),
+    radial-gradient(circle at 85% 0%, rgba(31, 214, 200, 0.1), transparent 24%),
+    linear-gradient(180deg, var(--background) 0%, var(--background-2) 48%, #0a1120 100%);
 }
 
 .container-shell {
